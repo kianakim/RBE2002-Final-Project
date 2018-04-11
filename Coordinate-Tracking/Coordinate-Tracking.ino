@@ -6,11 +6,14 @@ double candle_x = 0;
 double candle_y = 0;
 double candle_z = 0;
 
-void setup() {
 
+
+void setup() {
+  
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
+  // forward is +x //for example
+  // whenever you use driveForward(), after completed update variable
+  
 }
