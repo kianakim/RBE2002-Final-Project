@@ -62,6 +62,7 @@ void driveForward(int dist) {
   }
 }
 
+// stop drive motors
 void driveStop() {
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
