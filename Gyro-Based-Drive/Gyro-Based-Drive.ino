@@ -49,7 +49,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   driveTurn(RIGHT, 130);
   delay(1000);
-  driveTurn(LEFT, 200);
+  driveTurn(LEFT, 200); 
   delay(1000);
 }
 

@@ -8,11 +8,11 @@
 
 // sensor object array
 NewPing sensors[SONAR_NUM] = {
-  NewPing(1, 2, MAX_DISTANCE),
-  NewPing(3, 4, MAX_DISTANCE),
-  NewPing(5, 6, MAX_DISTANCE),
-  NewPing(7, 8, MAX_DISTANCE),
-  NewPing(9, 10, MAX_DISTANCE),
+  NewPing(4, 5, MAX_DISTANCE),  // back left
+  NewPing(6, 7, MAX_DISTANCE),  // back right
+  NewPing(15, 14, MAX_DISTANCE),  // front right
+  NewPing(0, 1, MAX_DISTANCE),  // front left
+  NewPing(2, 3, MAX_DISTANCE), // front
 };
 
 // which sensor is active
@@ -31,7 +31,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+  readAllUltrasonic();
 }
 
 void readAllUltrasonic() {
@@ -70,4 +70,3 @@ void printReadings() {
   }
   Serial.println();
 }
-
