@@ -61,6 +61,7 @@ void echoCheck() {
     dist[active_sensor] = sensors[active_sensor].ping_result / US_ROUNDTRIP_CM; // conversion factor in lib
 }
 
+// prints readings for testing
 void printReadings() {
   for (uint8_t i = 0; i < SONAR_NUM; i++) {
     Serial.print(i);
@@ -70,3 +71,5 @@ void printReadings() {
   }
   Serial.println();
 }
+
+
