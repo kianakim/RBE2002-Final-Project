@@ -19,26 +19,36 @@ const int rightREVPin = 3;
 // gyro variables
 float G_Dt = 0.020;  // Integration time (DCM algorithm)
 double const G_gain = .00875; // gyros gain factor for 250deg/sec
-double gyro_x;
-double gyro_y;
-double gyro_z;
+float gyro_x; // gyro x value, used by gyroRead and complementaryFilter
+float gyro_y;
+float gyro_z;
+float gyro_xold; //gyro cummulative x value
+float gyro_yold;
+float gyro_zold;
+float gerrx; // gyro x error
+float gerry;
+float gerrz;
 
-double gerr_x;
-double gerr_y;
-double gerr_z;
+// accel variables
+double A_gain = 0.00875;
+float accel_x;
+float accel_y;
+float accel_z;
 
 // pid variables
 #define kp 2.822
+
+/* END OF VARIABLE DECLARATIONS */
 
 void setup() {
   Serial.begin(115200);
   Wire.begin(); // start I2C
 
   // initialize gyro
-//  gyro.init();
-//  gyro.enableDefault(); // 250 deg/s
-//  delay(1000);
-//  gyroZero();
+  //  gyro.init();
+  //  gyro.enableDefault(); // 250 deg/s
+  //  delay(1000);
+  //  gyroZero();
   analogWrite(leftFWDPin, 0);
   analogWrite(leftREVPin, 0);
   analogWrite(rightFWDPin, 0);
@@ -46,81 +56,154 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  driveTurn(RIGHT, 130);
-  delay(1000);
-  driveTurn(LEFT, 200); 
-  delay(1000);
+
 }
 
-//// gyro calibration "zero"
-//// sample 200 readings and take the average to get calibration offset
-//void gyroZero() {
-//  for (int i = 0; i < 200; i++) {
-//    gyro.read();
-//
-//    gerr_x += gyro.g.x;
-//    gerr_y += gyro.g.y;
-//    gerr_z += gyro.g.z;
-//
-//    delay(20);
-//  }
-//
-//  gerr_x = gerr_x / 200;
-//  gerr_y = gerr_y / 200;
-//  gerr_z = gerr_z / 200;
-//}
-//
-//// read gyro
-//int gyroRead() {
-//  gyro.read();
-//  gyro_x = (double) (gyro.g.x - gerr_x) * G_gain;
-//  gyro_y = (double) (gyro.g.y - gerr_y) * G_gain;
-//  gyro_z = (double) (gyro.g.z - gerr_z) * G_gain;
-//
-//  gyro_x = gyro_x * G_Dt; // Multiply the angular rate by the time interval
-//  gyro_y = gyro_y * G_Dt;
-//  gyro_z = gyro_z * G_Dt;
-//
-//  // add stuff
-//}
-//
-//
-//// print gyro
-//// from lab4 file
-//void printGyro() {
-//  Serial.print(" GX: ");
-//  Serial.print(gyro_x);
-//  Serial.print(" GY: ");
-//  Serial.print(gyro_y);
-//  Serial.print(" GZ: ");
-//  Serial.print(gyro_z);
-//}
-//
-//// turn left 90deg w/ gyro
-//// for future note, might want to turn off? interrupts when turning
-//// or maybe not because gyro will track position just not for too long
-//void gyroTurn(int dir) {
-//  int turn_angle = 90;
-//  int turn_error = 0;
-//
-//  // zero gyro
-//  gyroZero();
-//  delay(20);
-//
-//  // initial gyro read
-//  double reading = 0; // w/e put stuff here
-//
-//  // check gyro sensors n stuff
-//  while (abs(reading) < turn_angle) {
-//    turn_error = turn_angle - reading;
-//    driveTurn(dir, turn_error * kp);
-//    gyroRead();
-//  }
-//}
+/* START OF IMU METHODS */
 
-// run motor based on direction and motor speed parameters
+// gyro calibration "zero"
+// sample 200 readings and take the average to get calibration offset
+void gyroZero() {
+  for (int i = 0; i < 200; i++) {
+    gyro.read();
+    gerrx += gyro.g.x;
+    gerry += gyro.g.y;
+    gerrz += gyro.g.z;
+    delay(20);
+  }
+
+  gerrx = gerrx / 200; // average reading to obtain an error/offset
+  gerry = gerry / 200;
+  gerrz = gerrz / 200;
+
+  Serial.println(gerrx); // print error vals
+  Serial.println(gerry);
+  Serial.println(gerrz);
+}
+
+// add actual description pls kiana
+void gyroRead() {
+  gyro.read();
+
+  gyro_x = (double)(gyro.g.x - gerrx) * G_gain; // offset by error then multiply by gyro gain factor
+  gyro_y = (double)(gyro.g.y - gerry) * G_gain;
+  gyro_z = (double)(gyro.g.z - gerrz) * G_gain;
+
+  gyro_x = gyro_x * G_Dt; // Multiply the angular rate by the time interval
+  gyro_y = gyro_y * G_Dt;
+  gyro_z = gyro_z * G_Dt;
+
+  gyro_x += gyro_xold; // add the displacment(rotation) to the cumulative displacment
+  gyro_y += gyro_yold;
+  gyro_z += gyro_zold;
+
+  gyro_xold = gyro_x; // Set the old gyro angle to the current gyro angle
+  gyro_yold = gyro_y;
+  gyro_zold = gyro_z;
+}
+
+// print gyro
+// from lab4 file
+void printGyro() {
+  Serial.print(" GX: ");
+  Serial.print(gyro_x);
+  Serial.print(" GY: ");
+  Serial.print(gyro_y);
+  Serial.print(" GZ: ");
+  Serial.print(gyro_z);
+
+  Serial.print("  Ax =  ");
+  Serial.print(accel_x);
+  Serial.print("  Ay =  ");
+  Serial.print(accel_y);
+  Serial.print("  Az =  ");
+  Serial.println(accel_z);
+}
+
+// initialize accelerometer - lab4 compliment file
+// checks for device type, don't really need to modify
+void accelInit()
+{
+  accel.init();
+  accel.enableDefault();
+  Serial.print("Accel Device ID");
+  Serial.println(accel.getDeviceType());
+  switch (accel.getDeviceType())
+  {
+    case LSM303::device_D:
+      accel.writeReg(LSM303::CTRL2, 0x18); // 8 g full scale: AFS = 011
+      break;
+    case LSM303::device_DLHC:
+      accel.writeReg(LSM303::CTRL_REG4_A, 0x28); // 8 g full scale: FS = 10; high resolution output mode
+      break;
+    default: // DLM, DLH
+      accel.writeReg(LSM303::CTRL_REG4_A, 0x30); // 8 g full scale: FS = 11
+  }
+}
+
+// Reads x,y and z accelerometer registers
+void accelRead()
+{
+  accel.readAcc();
+
+  accel_x = accel.a.x >> 4; // shift left 4 bits to use 12-bit representation (1 g = 256)
+  accel_y = accel.a.y >> 4;
+  accel_z = accel.a.z >> 4;
+
+  // accelerations in G
+  accel_x = (accel_x / 256);
+  accel_y = (accel_y / 256);
+  accel_z = (accel_z / 256);
+}
+
+// implements complementary filter w/ gyro and accel data
+// updates gyro val variables
+void complementaryFilter() {
+  gyroRead();
+  accelRead();
+  double x_Acc, y_Acc;
+  double magnitudeofAccel = (abs(accel_x) + abs(accel_y) + abs(accel_z));
+  if (magnitudeofAccel > 6 && magnitudeofAccel < 1.2)
+  {
+    x_Acc = atan2(accel_y, accel_z) * 180 / PI;
+    gyro_x = gyro_x * 0.98 + x_Acc * 0.02;
+
+    y_Acc = atan2(accel_x, accel_z) * 180 / PI;
+    gyro_y = gyro_y * 0.98 + y_Acc * 0.02;
+  }
+}
+
+/* END OF IMU METHODS */
+
+/* START OF DRIVE METHODS */
+
+// turn robot given direction parameter
+// drive using while loop not iterating through state machine
+void gyroTurn(int dir) {
+  int turn_angle = 90;
+  int turn_error = 0;
+
+  // zero gyro
+  gyroZero();
+  double reading = 0;
+
+  // turning
+  while (abs(reading) < turn_angle) {
+    // check angle error (for proportional control)
+    turn_error = turn_angle - reading;
+
+    // run drive turn method w/ P-controlled speed
+    driveTurn(dir, turn_error * kp);
+
+    // update sensor reading
+    gyroRead();
+    reading = gyro_z; // or w/e axis needs to be read
+  }
+}
+
+// set motor controller based on direction and motor speed parameters
 void driveTurn(int dir, int motor_speed) {
+  
   // check desired direction, set appropriate motors
   if (dir == RIGHT) {
     analogWrite(leftFWDPin, motor_speed);
@@ -145,4 +228,3 @@ void driveStop() {
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
 }
-
