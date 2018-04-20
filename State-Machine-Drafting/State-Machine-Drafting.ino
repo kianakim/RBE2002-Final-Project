@@ -1,6 +1,7 @@
 // state machine stuff
 
-static enum navStates {hugWall, driveForward, turning, drivePastWall, stopRobot, finished} navStates;
+static enum navStates {hugWall, driveForward, turning, drivePastWall, stopRobot, fini
+shed} navStates;
 
 void setup() {
   // put your setup code here, to run once:

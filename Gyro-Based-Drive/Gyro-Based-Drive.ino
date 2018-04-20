@@ -12,6 +12,11 @@ LSM303 accel;
 #define RIGHT 1
 #define FORWARD 2
 
+// state machine
+unsigned int state = 0;
+int turn_angle = 90;
+int turn_error = 0;
+
 // motor variables
 const int leftFWDPin = 13; // IN2
 const int leftREVPin = 12;
@@ -20,14 +25,15 @@ const int rightREVPin = 4;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
+#define TESTING 587716
 #define DISTIN_TO_DEG 20.834  // 360deg/(2*Pi*2.75" wheel)
 #define DISTCM_TO_DEG 8.203   // 360deg/(2*Pi*6.985cm wheel)
 
-Encoder leftDriveEnc(9, 10);
+Encoder leftDriveEnc(10, 11);
 Encoder rightDriveEnc(2, 3);
 
 // gyro variables
-double G_Dt = 0.020;  // Integration time (DCM algorithm)
+double G_Dt = 0.035;  // Integration time (DCM algorithm)
 double const G_gain = 0.00875; // gyros gain factor for 250deg/sec
 double gyro_x; // gyro x value, used by gyroRead and complementaryFilter
 double gyro_y;
@@ -50,14 +56,17 @@ long timer1 = 0;
 long timer2 = 0;
 
 // pid variables
-#define kp 1.9
+#define kp 2
 /* END OF VARIABLE DECLARATIONS */
+
+/* SETUP AND LOOP */
 
 void setup() {
   analogWrite(leftFWDPin, 0);
   analogWrite(leftREVPin, 0);
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
+  delay(1000);
   Serial.begin(9600);
   Serial.println("STARTING SETUP");
   Wire.begin(); // start I2C
@@ -72,9 +81,21 @@ void setup() {
   delay(1000);
   gyroZero();
   accelInit();
+  delay(1000);
 }
 
 void loop() {
+  switch (state) {
+    case 0:
+//      gyroTurn(LEFT);
+      encTurn(LEFT);
+      break;
+    case 1:
+      driveStop();
+      delay(1000);
+      break;
+  }
+
   //  if ((millis() - timer) >= 20)
   //  {
   //    complementaryFilter();
@@ -84,13 +105,13 @@ void loop() {
   //  {
   //    printGyro();
   //  }
-
-  delay(1000);
-  gyroTurn(LEFT);
-  Serial.println("DONE");
-  delay(5000);
-  driveStop();
-  exit(1);
+  //
+  //  delay(1000);
+  //  gyroTurn(LEFT);
+  //  Serial.println("DONE");
+  //  driveStop();
+  //  delay(5000);
+  //  exit(1);
 }
 
 /* START OF IMU METHODS */
@@ -236,64 +257,78 @@ void gyroForward(int dist_cm) {
   if (gyro_err > 1) {
     dir = RIGHT;
   }
-  else if (gyro_err < -1) {
+  else if (gyro_err < 1) {
     dir = LEFT;
   }
   else {
     dir = FORWARD;
   }
-
-  while (dist_err > 5) {
-
-  }
 }
 
-// turn robot given direction parameter
-// drive using while loop not iterating through state machine
+// turns robot 90 deg in given direction
 void gyroTurn(int dir) {
-  int turn_angle = 90;
-  int turn_error = 0;
+  turn_error = turn_angle - abs(gyro_z);
+  double percent = turn_error / (double) turn_angle;
 
-  // zero gyro
-  gyroZero();
-  double reading = 0;
-
-  // turning
-  while (abs(reading) < turn_angle) {
+  if (abs(turn_error) > 1) {
     // check angle error (for proportional control)
-    turn_error = turn_angle - reading;
+    Serial.print("TURN ERROR: ");
+    Serial.println(turn_error);
 
     // run drive turn method w/ P-controlled speed
-    driveMotors(dir, turn_error * kp);
+    driveMotors(dir, percent * 255);
 
     // update sensor reading
     complementaryFilter();
-    reading = gyro_z; // or w/e axis needs to be read
-    Serial.println(reading);
+    Serial.print("GYRO: ");
+    Serial.println(gyro_z);
+  }
+  else {
+    driveStop();
+    state = 1;
   }
 }
 
-// set motor controller based on direction and motor speed parameters
-void driveMotors(int dir, int motor_speed) {
+// LEFT ENCODER RETURNING WEIRD VALUES
+void encTurn(int dir) {
+  int total_counts = 2900; // 90 deg
+  int rightRead = rightDriveEnc.read();
+  turn_error = total_counts - abs(rightRead);
+  Serial.print("LEFT: ");
+  Serial.println(rightRead);
+  
+  if(turn_error > 10) {
+    driveMotors(dir, 90);
+  }
+  else {
+    driveStop();
+    state = 1;
+  }
+}
 
+// set drive motor speed and direction
+// dir: LEFT (0), RIGHT (1), FORWARD (2)
+void driveMotors(int dir, int motor_speed) {
+//  Serial.println(motor_speed);
+  int mspeed = constrain(motor_speed, 0, 255);
   // check desired direction, set appropriate motors
   if (dir == RIGHT) {
-    analogWrite(leftFWDPin, motor_speed);
+    analogWrite(leftFWDPin, mspeed);
     analogWrite(leftREVPin, 0);
     analogWrite(rightFWDPin, 0);
-    analogWrite(rightREVPin, motor_speed);
+    analogWrite(rightREVPin, mspeed);
     //    Serial.println("RIGHT");
   }
   else if (dir == FORWARD) {
-    analogWrite(leftFWDPin, motor_speed);
+    analogWrite(leftFWDPin, mspeed);
     analogWrite(leftREVPin, 0);
-    analogWrite(rightFWDPin, motor_speed);
+    analogWrite(rightFWDPin, mspeed);
     analogWrite(rightREVPin, 0);
   }
-  else {
+  else if (dir == LEFT) {
     analogWrite(leftFWDPin, 0);
-    analogWrite(leftREVPin, motor_speed);
-    analogWrite(rightFWDPin, motor_speed);
+    analogWrite(leftREVPin, mspeed);
+    analogWrite(rightFWDPin, mspeed);
     analogWrite(rightREVPin, 0);
     //    Serial.println("LEFT");
   }

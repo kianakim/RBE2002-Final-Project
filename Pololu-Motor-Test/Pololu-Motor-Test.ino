@@ -10,12 +10,12 @@
 const int leftFWDPin = 13; // IN2
 const int leftREVPin = 12;
 const int rightFWDPin = 5; // IN1
-const int rightREVPin = 4; 
+const int rightREVPin = 4;
 
 // PATTERN LOOKING AT IT W/ DIGITAL PINS ON FAR SIDE: O - B - O - B
 
 // Encoders
-Encoder leftDrive(9, 10); // YEL - INT3, WH - D1
+Encoder leftDrive(10, 11); // YEL - INT3, WH - D1
 Encoder rightDrive(2, 3); // YEL - INT2, WH - D0
 
 
@@ -27,12 +27,12 @@ double right_pos = 0;
 
 void setup() {
   Serial.begin(115200);
-
+  
   // set all motor signal pins to LOW
   analogWrite(leftFWDPin, 0);
   analogWrite(leftREVPin, 0);
   analogWrite(rightFWDPin, 0);
-  analogWrite(rightREVPin, 0);    
+  analogWrite(rightREVPin, 0);
 
   // set test state
   test_state = TWO_MOTOR_TEST;
@@ -47,7 +47,7 @@ void loop() {
       // set motor speed
       analogWrite(rightFWDPin, motor_speed);
       analogWrite(rightREVPin, 0);
-      
+
       // print output
       Serial.print("Enc: ");
       Serial.println(left_pos);
@@ -63,6 +63,11 @@ void loop() {
       analogWrite(leftREVPin, 0);
       analogWrite(rightFWDPin, motor_speed);
       analogWrite(rightREVPin, 0);
+
+      Serial.print("Left: ");
+      Serial.print(left_pos);
+      Serial.print(" Right: ");
+      Serial.println(right_pos);
       break;
   }
 }
