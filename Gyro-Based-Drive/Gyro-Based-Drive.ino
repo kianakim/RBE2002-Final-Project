@@ -4,59 +4,93 @@
 #include <Wire.h>
 #include <L3G.h>
 #include <LSM303.h>
+#include <Encoder.h>
 L3G gyro;
 LSM303 accel;
 
 #define LEFT 0
 #define RIGHT 1
+#define FORWARD 2
 
 // motor variables
-const int leftFWDPin = 5; // IN2
-const int leftREVPin = 6;
-const int rightFWDPin = 4; // IN1
-const int rightREVPin = 3;
+const int leftFWDPin = 13; // IN2
+const int leftREVPin = 12;
+const int rightFWDPin = 5; // IN1
+const int rightREVPin = 4;
+
+// encoder variables
+#define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
+#define DISTIN_TO_DEG 20.834  // 360deg/(2*Pi*2.75" wheel)
+#define DISTCM_TO_DEG 8.203   // 360deg/(2*Pi*6.985cm wheel)
+
+Encoder leftDriveEnc(9, 10);
+Encoder rightDriveEnc(2, 3);
 
 // gyro variables
-float G_Dt = 0.020;  // Integration time (DCM algorithm)
-double const G_gain = .00875; // gyros gain factor for 250deg/sec
-float gyro_x; // gyro x value, used by gyroRead and complementaryFilter
-float gyro_y;
-float gyro_z;
-float gyro_xold; //gyro cummulative x value
-float gyro_yold;
-float gyro_zold;
-float gerrx; // gyro x error
-float gerry;
-float gerrz;
+double G_Dt = 0.020;  // Integration time (DCM algorithm)
+double const G_gain = 0.00875; // gyros gain factor for 250deg/sec
+double gyro_x; // gyro x value, used by gyroRead and complementaryFilter
+double gyro_y;
+double gyro_z;
+double gyro_xold; //gyro cummulative x value
+double gyro_yold;
+double gyro_zold;
+double gerrx; // gyro x error
+double gerry;
+double gerrz;
 
 // accel variables
 double A_gain = 0.00875;
-float accel_x;
-float accel_y;
-float accel_z;
+double accel_x;
+double accel_y;
+double accel_z;
+
+long timer = 0; //general purpose timer
+long timer1 = 0;
+long timer2 = 0;
 
 // pid variables
-#define kp 2.822
-
+#define kp 1.9
 /* END OF VARIABLE DECLARATIONS */
 
 void setup() {
-  Serial.begin(115200);
-  Wire.begin(); // start I2C
-
-  // initialize gyro
-  //  gyro.init();
-  //  gyro.enableDefault(); // 250 deg/s
-  //  delay(1000);
-  //  gyroZero();
   analogWrite(leftFWDPin, 0);
   analogWrite(leftREVPin, 0);
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
+  Serial.begin(9600);
+  Serial.println("STARTING SETUP");
+  Wire.begin(); // start I2C
+
+  // initialize gyro
+  if (!gyro.init()) { // gyro init
+    Serial.println("Failed to autodetect gyro type!");
+    while (1);
+  }
+  timer = millis();
+  gyro.enableDefault(); // 250 deg/s
+  delay(1000);
+  gyroZero();
+  accelInit();
 }
 
 void loop() {
+  //  if ((millis() - timer) >= 20)
+  //  {
+  //    complementaryFilter();
+  //  }
+  //  // prints the gyro value once per second
+  //  if ((millis() - timer2) >= 1000)
+  //  {
+  //    printGyro();
+  //  }
 
+  delay(1000);
+  gyroTurn(LEFT);
+  Serial.println("DONE");
+  delay(5000);
+  driveStop();
+  exit(1);
 }
 
 /* START OF IMU METHODS */
@@ -84,6 +118,7 @@ void gyroZero() {
 // add actual description pls kiana
 void gyroRead() {
   gyro.read();
+  timer = millis(); //reset timer
 
   gyro_x = (double)(gyro.g.x - gerrx) * G_gain; // offset by error then multiply by gyro gain factor
   gyro_y = (double)(gyro.g.y - gerry) * G_gain;
@@ -105,6 +140,8 @@ void gyroRead() {
 // print gyro
 // from lab4 file
 void printGyro() {
+  timer2 = millis();
+
   Serial.print(" GX: ");
   Serial.print(gyro_x);
   Serial.print(" GY: ");
@@ -177,6 +214,40 @@ void complementaryFilter() {
 
 /* START OF DRIVE METHODS */
 
+// manual drive forward x cm based on encoder readings
+void gyroForward(int dist_cm) {
+  // gets rotation angle from dist parameters
+  double total_deg = dist_cm * DISTCM_TO_DEG;
+
+  // converts degrees to encoder counts
+  double total_counts = total_deg * COUNTS_PER_DEG; // might need to be an int???
+
+  // initial IMU and encoders readings
+  int dir = FORWARD;
+  gyroZero(); // calibration
+  complementaryFilter(); // updates gyro values
+  leftDriveEnc.write(0);
+  double left_pos = leftDriveEnc.read();
+  //  double right_pos = rightDriveEnc.read();
+
+  // Proportional Control setup
+  double gyro_err = gyro_z; // CHANGE DEPENDING ON IMU ORIENTATION
+  double dist_err = left_pos - total_counts;  // CHOOSE W/E SIDE IS MORE RELIABLE
+  if (gyro_err > 1) {
+    dir = RIGHT;
+  }
+  else if (gyro_err < -1) {
+    dir = LEFT;
+  }
+  else {
+    dir = FORWARD;
+  }
+
+  while (dist_err > 5) {
+
+  }
+}
+
 // turn robot given direction parameter
 // drive using while loop not iterating through state machine
 void gyroTurn(int dir) {
@@ -193,31 +264,38 @@ void gyroTurn(int dir) {
     turn_error = turn_angle - reading;
 
     // run drive turn method w/ P-controlled speed
-    driveTurn(dir, turn_error * kp);
+    driveMotors(dir, turn_error * kp);
 
     // update sensor reading
-    gyroRead();
+    complementaryFilter();
     reading = gyro_z; // or w/e axis needs to be read
+    Serial.println(reading);
   }
 }
 
 // set motor controller based on direction and motor speed parameters
-void driveTurn(int dir, int motor_speed) {
-  
+void driveMotors(int dir, int motor_speed) {
+
   // check desired direction, set appropriate motors
   if (dir == RIGHT) {
     analogWrite(leftFWDPin, motor_speed);
     analogWrite(leftREVPin, 0);
     analogWrite(rightFWDPin, 0);
     analogWrite(rightREVPin, motor_speed);
-    Serial.println("RIGHT");
+    //    Serial.println("RIGHT");
+  }
+  else if (dir == FORWARD) {
+    analogWrite(leftFWDPin, motor_speed);
+    analogWrite(leftREVPin, 0);
+    analogWrite(rightFWDPin, motor_speed);
+    analogWrite(rightREVPin, 0);
   }
   else {
     analogWrite(leftFWDPin, 0);
     analogWrite(leftREVPin, motor_speed);
     analogWrite(rightFWDPin, motor_speed);
     analogWrite(rightREVPin, 0);
-    Serial.println("LEFT");
+    //    Serial.println("LEFT");
   }
 }
 
