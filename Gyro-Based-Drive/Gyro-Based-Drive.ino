@@ -5,17 +5,21 @@
 #include <L3G.h>
 #include <LSM303.h>
 #include <Encoder.h>
+#include "PID.h"
+
 L3G gyro;
 LSM303 accel;
 
-#define LEFT 0
+// FRONT IS THE SIDE WITH THE BREADBOARD
+#define LEFT -1
 #define RIGHT 1
-#define FORWARD 2
+#define FORWARD 0
 
-// state machine
 unsigned int state = 0;
-int turn_angle = 90;
+int turn_SP = 90;
 int turn_error = 0;
+
+boolean front_sensor = false;
 
 // motor variables
 const int leftFWDPin = 13; // IN2
@@ -56,44 +60,61 @@ long timer1 = 0;
 long timer2 = 0;
 
 // pid variables
-#define kp 2
+PID pidDrive;
 /* END OF VARIABLE DECLARATIONS */
 
 /* SETUP AND LOOP */
 
 void setup() {
+  // set drive signal pins low
   analogWrite(leftFWDPin, 0);
   analogWrite(leftREVPin, 0);
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
   delay(1000);
+
+  // serial monitor setup
   Serial.begin(9600);
   Serial.println("STARTING SETUP");
+
   Wire.begin(); // start I2C
 
-  // initialize gyro
+  // initialize gyro sensor
   if (!gyro.init()) { // gyro init
     Serial.println("Failed to autodetect gyro type!");
     while (1);
   }
-  timer = millis();
   gyro.enableDefault(); // 250 deg/s
-  delay(1000);
   gyroZero();
   accelInit();
   delay(1000);
+  pidDrive.setpid(1, 1, 1);
+  timer = millis();
 }
 
 void loop() {
+  Serial.println(state);
   switch (state) {
     case 0:
-//      gyroTurn(LEFT);
-      encTurn(LEFT);
+      gyroTurn();
+      //      encTurn(LEFT);
       break;
     case 1:
       driveStop();
-      delay(1000);
+      state = 2;
+      gyroReset();
+      //      turn_SP = 0;
+      //      rightDriveEnc.write(0);
+      delay(3000);
       break;
+    case 2:
+      gyroTurn();
+      break;
+    case 3:
+      Serial.println(gyro_z);
+      driveStop();
+      //      rightDriveEnc.write(0);
+      delay(1000);
   }
 
   //  if ((millis() - timer) >= 20)
@@ -105,9 +126,9 @@ void loop() {
   //  {
   //    printGyro();
   //  }
-  //
+
   //  delay(1000);
-  //  gyroTurn(LEFT);
+  //  gyroTurn();
   //  Serial.println("DONE");
   //  driveStop();
   //  delay(5000);
@@ -156,6 +177,18 @@ void gyroRead() {
   gyro_xold = gyro_x; // Set the old gyro angle to the current gyro angle
   gyro_yold = gyro_y;
   gyro_zold = gyro_z;
+}
+
+void gyroReset() {
+  gyro_x = 0; // gyro x value, used by gyroRead and complementaryFilter
+  gyro_y = 0;
+  gyro_z = 0;
+  gyro_xold = 0;
+  gyro_yold = 0;
+  gyro_zold = 0;
+  gerrx = 0;
+  gerry = 0;
+  gerrz = 0;
 }
 
 // print gyro
@@ -236,80 +269,61 @@ void complementaryFilter() {
 /* START OF DRIVE METHODS */
 
 // manual drive forward x cm based on encoder readings
-void gyroForward(int dist_cm) {
-  // gets rotation angle from dist parameters
-  double total_deg = dist_cm * DISTCM_TO_DEG;
+void gyroForward() {
 
-  // converts degrees to encoder counts
-  double total_counts = total_deg * COUNTS_PER_DEG; // might need to be an int???
+  if (!front_sensor) {
 
-  // initial IMU and encoders readings
-  int dir = FORWARD;
-  gyroZero(); // calibration
-  complementaryFilter(); // updates gyro values
-  leftDriveEnc.write(0);
-  double left_pos = leftDriveEnc.read();
-  //  double right_pos = rightDriveEnc.read();
+  }
 
-  // Proportional Control setup
-  double gyro_err = gyro_z; // CHANGE DEPENDING ON IMU ORIENTATION
-  double dist_err = left_pos - total_counts;  // CHOOSE W/E SIDE IS MORE RELIABLE
-  if (gyro_err > 1) {
-    dir = RIGHT;
-  }
-  else if (gyro_err < 1) {
-    dir = LEFT;
-  }
-  else {
-    dir = FORWARD;
-  }
+  //  // initial IMU and encoders readings
+  //  int dir = FORWARD;
+  //  gyroZero(); // calibration
+  //  complementaryFilter(); // updates gyro values
+  //  leftDriveEnc.write(0);
+  //  double left_pos = leftDriveEnc.read();
+  //  //  double right_pos = rightDriveEnc.read();
+  //
+  //  // Proportional Control setup
+  //  double gyro_err = gyro_z; // CHANGE DEPENDING ON IMU ORIENTATION
+  //  double dist_err = left_pos - total_counts;  // CHOOSE W/E SIDE IS MORE RELIABLE
+  //  if (gyro_err > 1) {
+  //    dir = RIGHT;
+  //  }
+  //  else if (gyro_err < 1) {
+  //    dir = LEFT;
+  //  }
+  //  else {
+  //    dir = FORWARD;
+  //  }
 }
 
 // turns robot 90 deg in given direction
-void gyroTurn(int dir) {
-  turn_error = turn_angle - abs(gyro_z);
-  double percent = turn_error / (double) turn_angle;
+// not enough power when angle error < like 3 deg
+void gyroTurn() {
+  turn_error = turn_SP - gyro_z;
+  int mspeed = pidDrive.calc(turn_error, gyro_z);
 
   if (abs(turn_error) > 1) {
-    // check angle error (for proportional control)
-    Serial.print("TURN ERROR: ");
-    Serial.println(turn_error);
-
     // run drive turn method w/ P-controlled speed
-    driveMotors(dir, percent * 255);
+    driveMotors(setTurnDir(turn_error), mspeed);
 
     // update sensor reading
     complementaryFilter();
+    
+    Serial.print("TURN ERROR: ");
+    Serial.println(turn_error);
     Serial.print("GYRO: ");
     Serial.println(gyro_z);
   }
   else {
     driveStop();
-    state = 1;
-  }
-}
-
-// LEFT ENCODER RETURNING WEIRD VALUES
-void encTurn(int dir) {
-  int total_counts = 2900; // 90 deg
-  int rightRead = rightDriveEnc.read();
-  turn_error = total_counts - abs(rightRead);
-  Serial.print("LEFT: ");
-  Serial.println(rightRead);
-  
-  if(turn_error > 10) {
-    driveMotors(dir, 90);
-  }
-  else {
-    driveStop();
-    state = 1;
+    state++;
   }
 }
 
 // set drive motor speed and direction
-// dir: LEFT (0), RIGHT (1), FORWARD (2)
 void driveMotors(int dir, int motor_speed) {
-//  Serial.println(motor_speed);
+  Serial.println(motor_speed);
   int mspeed = constrain(motor_speed, 0, 255);
   // check desired direction, set appropriate motors
   if (dir == RIGHT) {
@@ -330,7 +344,6 @@ void driveMotors(int dir, int motor_speed) {
     analogWrite(leftREVPin, mspeed);
     analogWrite(rightFWDPin, mspeed);
     analogWrite(rightREVPin, 0);
-    //    Serial.println("LEFT");
   }
 }
 
@@ -341,3 +354,31 @@ void driveStop() {
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
 }
+
+// set turn direction based on sign of error
+int setTurnDir(double error) {
+  if (error < 0) {
+    return LEFT;
+  }
+  else {
+    return RIGHT;
+  }
+}
+
+// LEFT ENCODER RETURNING WEIRD VALUES
+// too much slack on wheels to use
+//void encTurn(int dir) {
+//  int total_counts = 2900; // 90 deg
+//  int rightRead = rightDriveEnc.read();
+//  turn_error = total_counts - abs(rightRead);
+//  Serial.print("LEFT: ");
+//  Serial.println(rightRead);
+//
+//  if (turn_error > 5) {
+//    driveMotors(dir, 100);
+//  }
+//  else {
+//    driveStop();
+//    state++;
+//  }
+//}
