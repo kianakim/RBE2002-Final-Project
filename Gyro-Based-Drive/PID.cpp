@@ -27,7 +27,7 @@ int PID::calc(double setpoint, double currVal){
     double changeInTime = (double)(now - last_time);
     
     // calculate error
-    double error = setpoint - currVal;
+    double error = abs(abs(setpoint) - currVal);
     
     // calculate derivative of error
     double dErr = (error - last_error) / changeInTime;
