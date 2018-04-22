@@ -120,7 +120,6 @@ void loop() {
         delay(3000);
         state = 5;
       }
-    
   }
 
   //  if ((millis() - timer) >= 20)
