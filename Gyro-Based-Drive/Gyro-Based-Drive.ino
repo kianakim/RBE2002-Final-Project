@@ -13,8 +13,6 @@ LSM303 accel;
 // FRONT IS THE SIDE WITH THE BREADBOARD
 #define LEFT -1
 #define RIGHT 1
-#define FORWARD 0
-#define FIX_FORWARD 2
 
 unsigned int state = 0;
 int gyro_SP = 0;
@@ -95,7 +93,7 @@ void setup() {
 }
 
 void loop() {
-//  Serial.println(state);
+  //  Serial.println(state);
   switch (state) {
     case 0:
       gyroTurn(RIGHT);
@@ -109,9 +107,20 @@ void loop() {
       gyroTurn(LEFT);
       break;
     case 3:
-      Serial.println(gyro_z);
       driveStop();
-      delay(1000);
+      delay(3000);
+      state = 4;
+      break;
+    case 4:
+      if(!front_sensor) {
+        gyroForward();
+      }
+      else {
+        driveStop();
+        delay(3000);
+        state = 5;
+      }
+    
   }
 
   //  if ((millis() - timer) >= 20)
@@ -265,43 +274,49 @@ void complementaryFilter() {
 
 /* START OF DRIVE METHODS */
 
-// manual drive forward x cm based on encoder readings
 void gyroForward() {
+  int motor_speed = 100;
   turn_error = gyro_SP - gyro_z;
-  int mspeed = pidDrive.calc(gyro_SP, gyro_z);
-  
+  int motor_diff = pidDrive.calc(gyro_SP, gyro_z);
+
+  if(turn_error > 0) { // robot is facing right
+    driveStraight(motor_speed + motor_diff, motor_speed - motor_diff);
+  }
+  else {
+    driveStraight(motor_speed - motor_diff, motor_speed + motor_diff);
+  }
 }
 
 // turns robot 90 deg in given direction
 // not enough power when angle error < like 3 deg
 void gyroTurn(int dir) {
   // change setpoint on initial run
-  if(first) {
+  if (first) {
     changeSP(dir);
     first = 0;
   }
   turn_error = gyro_SP - gyro_z;
-  
+
   Serial.print("SP: ");
   Serial.println(gyro_SP);
   Serial.print("GYRO: ");
   Serial.println(gyro_z);
-  
+
   int mspeed = pidDrive.calc(gyro_SP, gyro_z);
 
   if (abs(turn_error) > 1) {
     Serial.print("PID: ");
     Serial.println(mspeed);
     // run drive turn method w/ P-controlled speed
-    driveMotors(setTurnDir(turn_error), mspeed);
+    driveTurn(setTurnDir(turn_error), mspeed);
 
     // update sensor reading
     complementaryFilter();
-    
-//    Serial.print("TURN ERROR: ");
-//    Serial.println(turn_error);
-//    Serial.print("GYRO: ");
-//    Serial.println(gyro_z);
+
+    //    Serial.print("TURN ERROR: ");
+    //    Serial.println(turn_error);
+    //    Serial.print("GYRO: ");
+    //    Serial.println(gyro_z);
   }
   else {
     driveStop();
@@ -311,24 +326,17 @@ void gyroTurn(int dir) {
 }
 
 // set drive motor speed and direction
-void driveMotors(int dir, int motor_speed) {
+void driveTurn(int dir, int motor_speed) {
 
   // constrain motor speed value
   int mspeed = constrain(motor_speed, 0, 255);
-  
+
   // check desired direction, set appropriate motors
   if (dir == RIGHT) {
     analogWrite(leftFWDPin, mspeed);
     analogWrite(leftREVPin, 0);
     analogWrite(rightFWDPin, 0);
     analogWrite(rightREVPin, mspeed);
-    //    Serial.println("RIGHT");
-  }
-  else if (dir == FORWARD) {
-    analogWrite(leftFWDPin, mspeed);
-    analogWrite(leftREVPin, 0);
-    analogWrite(rightFWDPin, mspeed);
-    analogWrite(rightREVPin, 0);
   }
   else if (dir == LEFT) {
     analogWrite(leftFWDPin, 0);
@@ -336,9 +344,14 @@ void driveMotors(int dir, int motor_speed) {
     analogWrite(rightFWDPin, mspeed);
     analogWrite(rightREVPin, 0);
   }
-  else if (dir == FIX_FORWARD) {
-    
-  }
+}
+
+// used w/ gyro to drive along a straight path
+void driveStraight(int rspeed, int lspeed) {
+  analogWrite(leftFWDPin, lspeed);
+  analogWrite(leftREVPin, 0);
+  analogWrite(rightFWDPin, rspeed);
+  analogWrite(rightREVPin, 0);
 }
 
 // stop motors
@@ -360,7 +373,7 @@ int setTurnDir(double error) {
 }
 
 void changeSP(int dir) {
-  if(dir == LEFT) {
+  if (dir == LEFT) {
     gyro_SP -= 90;
   }
   else if (dir == RIGHT) {
@@ -378,7 +391,7 @@ void changeSP(int dir) {
 //  Serial.println(rightRead);
 //
 //  if (turn_error > 5) {
-//    driveMotors(dir, 100);
+//    driveTurn(dir, 100);
 //  }
 //  else {
 //    driveStop();
