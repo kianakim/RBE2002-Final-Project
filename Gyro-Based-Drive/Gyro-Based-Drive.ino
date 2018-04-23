@@ -311,11 +311,6 @@ void gyroTurn(int dir) {
 
     // update sensor reading
     complementaryFilter();
-
-    //    Serial.print("TURN ERROR: ");
-    //    Serial.println(turn_error);
-    //    Serial.print("GYRO: ");
-    //    Serial.println(gyro_z);
   }
   else {
     driveStop();
