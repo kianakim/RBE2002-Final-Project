@@ -68,9 +68,12 @@ void loop() {
 
 }
 
+/* ULTRASONIC SENSOR METHODS */
+
+// return whether the sensor sees a wall or not
 boolean ultrasonicState(int sensor) {
 
-  if (dist_cm[sensor] > 50) { // dummy number
+  if (dist_cm[sensor] > 20) { // dummy number
     return true;
   }
   else {
@@ -78,6 +81,8 @@ boolean ultrasonicState(int sensor) {
   }
 }
 
+// reads ultrasonic sensor array, prints readings, updates ultrasonic
+// signal transfer pin (to other Arduino)
 void readAllUltrasonic() {
   for (int i = 0; i < SONAR_NUM; i++) {
 
@@ -87,7 +92,7 @@ void readAllUltrasonic() {
 
       // end condition check
       if (active_sensor == SONAR_NUM - 1) {
-        printReadings();
+        printUltrasonicReadings();
 
         // update ultrasonic signal transfer pins
         for (int i = 0; i < SONAR_NUM; i++)
@@ -104,7 +109,7 @@ void readAllUltrasonic() {
 }
 
 // prints readings for testing
-void printReadings() {
+void printUltrasonicReadings() {
   for (uint8_t i = 0; i < SONAR_NUM; i++) {
     Serial.print(i);
     Serial.print("=");
@@ -118,5 +123,62 @@ void printReadings() {
 void echoCheck() {
   if (sensors[active_sensor].check_timer())
     dist_cm[active_sensor] = sensors[active_sensor].ping_result / 58.2; // convert uS to cm
+}
+
+/* CLIFF SENSOR METHODS */
+
+// these are bad names pls change
+void rangefinder() {
+  int distance;
+
+  // read rangefinder
+  GP2D12 = read_gp2d12_range(cliffPin);
+  a = GP2D12 / 10;
+  b = GP2D12 % 10;
+  distance = a * 10 + b;
+  Serial.println(GP2D12);
+
+  // might need to change to go HIGH-LOW depending on interrupt mode
+  if (distance > 50) {
+    digitalWrite(cliffSignal, HIGH);
+  }
+  else {
+    digitalWrite(cliffSignal, LOW);
+  }
+}
+
+// rangefinder read method
+float read_gp2d12_range(byte pin)
+{
+  int tmp;
+  tmp = analogRead(pin);
+  if (tmp < 3)return -1;
+  return (6787.0 / ((float)tmp - 3.0)) - 4.0;
+}
+
+// fix because this wont work with digital signal transfer
+// thing to send information to other arduino
+void flameSensor() {
+  // read flame sensor
+  int sensorReading = analogRead(flamePin);
+
+  if (sensorReading < 900 && sensorReading > 600) { //Distant Fire
+    //turn right and drive 20 inches
+    //turn right
+  }
+
+  else if (sensorReading < 600 && sensorReading > 300) { //close fire
+    //turn right and drive 10 inches
+    //turn right
+  }
+
+  else if (sensorReading < 300) { //point blank fire
+    //turn right
+    digitalWrite(flameSignal, HIGH);
+    //side to side/up down
+    // might need delay HIGH-LOW depending on interrupt mode
+    digitalWrite(flameSignal, LOW);
+    //turn right
+  }
 }
 
