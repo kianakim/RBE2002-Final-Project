@@ -22,10 +22,10 @@ int first = 1;
 boolean front_sensor = false;
 
 // motor variables
-const int leftFWDPin = 13; // IN2
-const int leftREVPin = 12;
-const int rightFWDPin = 5; // IN1
-const int rightREVPin = 4;
+const int leftFWDPin = 11; // IN2
+const int leftREVPin = 10;
+const int rightFWDPin = 4; // IN1
+const int rightREVPin = 5;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -60,7 +60,8 @@ long timer1 = 0;
 long timer2 = 0;
 
 // pid variables
-PID pidDrive;
+PID pidTurn;
+PID pidForward;
 /* END OF VARIABLE DECLARATIONS */
 
 /* SETUP AND LOOP */
@@ -88,7 +89,8 @@ void setup() {
   gyroZero();
   accelInit();
   delay(1000);
-  pidDrive.setpid(1, 0.0002, 1.2);
+  pidTurn.setpid(1, 0.0002, 1.2);
+  pidForward.setpid(1.1, 0.0002, 1.2);
   timer = millis();
 }
 
@@ -96,7 +98,8 @@ void loop() {
   //  Serial.println(state);
   switch (state) {
     case 0:
-      gyroTurn(RIGHT);
+//            gyroTurn(RIGHT);
+      gyroForward();
       break;
     case 1:
       driveStop();
@@ -112,7 +115,7 @@ void loop() {
       state = 4;
       break;
     case 4:
-      if(!front_sensor) {
+      if (!front_sensor) {
         gyroForward();
       }
       else {
@@ -273,17 +276,34 @@ void complementaryFilter() {
 
 /* START OF DRIVE METHODS */
 
+// untested gyroForward()
 void gyroForward() {
-  int motor_speed = 100;
+  int rmotor_speed, lmotor_speed;
+  int motor_const = 5; // to compensate for slower motor
+  int motor_speed = 90;
   turn_error = gyro_SP - gyro_z;
-  int motor_diff = pidDrive.calc(gyro_SP, gyro_z);
+  int motor_diff = pidForward.calc(gyro_SP, gyro_z);
+  Serial.print("TURN ERR: ");
+  Serial.println(turn_error);
 
-  if(turn_error > 0) { // robot is facing right
-    driveStraight(motor_speed + motor_diff, motor_speed - motor_diff);
+  if (turn_error > 0) { // robot is facing right
+    rmotor_speed = constrain(motor_speed + motor_diff + motor_const, 0, 254);
+    lmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
+    driveStraight(rmotor_speed, lmotor_speed);
   }
   else {
-    driveStraight(motor_speed - motor_diff, motor_speed + motor_diff);
+    rmotor_speed = constrain(motor_speed - motor_diff - motor_const, 0, 254);
+    lmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
+    driveStraight(rmotor_speed, lmotor_speed);
   }
+
+  Serial.print("RSPEED: ");
+  Serial.print(rmotor_speed);
+  Serial.print(" LSPEED: ");
+  Serial.println(lmotor_speed);
+
+  complementaryFilter();
+
 }
 
 // turns robot 90 deg in given direction
@@ -301,7 +321,7 @@ void gyroTurn(int dir) {
   Serial.print("GYRO: ");
   Serial.println(gyro_z);
 
-  int mspeed = pidDrive.calc(gyro_SP, gyro_z);
+  int mspeed = pidTurn.calc(gyro_SP, gyro_z);
 
   if (abs(turn_error) > 1) {
     Serial.print("PID: ");
