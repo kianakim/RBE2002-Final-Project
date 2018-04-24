@@ -5,6 +5,7 @@
 #include <L3G.h>
 #include <LSM303.h>
 #include <Encoder.h>
+#include "PID.h"
 
 L3G gyro;
 LSM303 accel;
@@ -58,6 +59,9 @@ long timer = 0; //general purpose timer
 long timer1 = 0;
 long timer2 = 0;
 
+// pid variables
+PID pidDrive;
+
 void setup() {
   // set drive signal pins low
   analogWrite(leftFWDPin, 0);
@@ -80,7 +84,7 @@ void setup() {
   gyroZero();
   accelInit();
   delay(1000);
-//  pidDrive.setpid(1, 0.0002, 1.2);
+  pidDrive.setpid(1, 0.0002, 1.2);
   timer = millis();
 }
 
@@ -282,51 +286,63 @@ void changeSP(int dir) {
 }
 
 // untested gyroForward()
-//void gyroForward() {
-//  int motor_speed = 100;
-//  turn_error = gyro_SP - gyro_z;
-//  int motor_diff = pidDrive.calc(gyro_SP, gyro_z);
-//
-//  if(turn_error > 0) { // robot is facing right
-//    driveStraight(motor_speed + motor_diff, motor_speed - motor_diff);
-//  }
-//  else {
-//    driveStraight(motor_speed - motor_diff, motor_speed + motor_diff);
-//  }
-//}
+void gyroForward() {
+  int rmotor_speed, lmotor_speed;
+  int motor_speed = 50;
+  turn_error = gyro_SP - gyro_z;
+  int motor_diff = pidDrive.calc(gyro_SP, gyro_z);
+  Serial.print("TURN ERR: ");
+  Serial.println(turn_error)
+  
+  if(turn_error > 0) { // robot is facing right
+    rmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
+    lmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
+    driveStraight(rmotor_speed, lmotor_speed);
+  }
+  else {
+    rmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
+    lmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
+    driveStraight(rmotor_speed, lmotor_speed);
+  }
 
-//// turns robot 90 deg in given direction
-//// not enough power when angle error < like 3 deg
-//void gyroTurn(int dir) {
-//  // change setpoint on initial run
-//  if (first) {
-//    changeSP(dir);
-//    first = 0;
-//  }
-//  turn_error = gyro_SP - gyro_z;
-//
-//  Serial.print("SP: ");
-//  Serial.println(gyro_SP);
-//  Serial.print("GYRO: ");
-//  Serial.println(gyro_z);
-//
-//  int mspeed = pidDrive.calc(gyro_SP, gyro_z);
-//
-//  if (abs(turn_error) > 1) {
-//    Serial.print("PID: ");
-//    Serial.println(mspeed);
-//    // run drive turn method w/ P-controlled speed
-//    driveTurn(setTurnDir(turn_error), mspeed);
-//
-//    // update sensor reading
-//    complementaryFilter();
-//  }
-//  else {
-//    driveStop();
-//    first = 1;
-//    state++;
-//  }
-//}
+  Serial.print("RSPEED: ");
+  Serial.print(rmotor_speed);
+  Serial.print(" LSPEED: ");
+  Serial.println(lmotor_speed);
+}
+
+// turns robot 90 deg in given direction
+// not enough power when angle error < like 3 deg
+void gyroTurn(int dir) {
+  // change setpoint on initial run
+  if (first) {
+    changeSP(dir);
+    first = 0;
+  }
+  turn_error = gyro_SP - gyro_z;
+
+  Serial.print("SP: ");
+  Serial.println(gyro_SP);
+  Serial.print("GYRO: ");
+  Serial.println(gyro_z);
+
+  int mspeed = pidDrive.calc(gyro_SP, gyro_z);
+
+  if (abs(turn_error) > 1) {
+    Serial.print("PID: ");
+    Serial.println(mspeed);
+    // run drive turn method w/ P-controlled speed
+    driveTurn(setTurnDir(turn_error), mspeed);
+
+    // update sensor reading
+    complementaryFilter();
+  }
+  else {
+    driveStop();
+    first = 1;
+    state++;
+  }
+}
 
 /* END OF GYRO METHODS */
 
