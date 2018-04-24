@@ -14,18 +14,17 @@ LSM303 accel;
 #define LEFT -1
 #define RIGHT 1
 
-unsigned int state = 0;
-int gyro_SP = 0;
-int turn_error = 0;
+// state machine variables
+static enum robotState {initial, driveForward, frontWall, seeCandle, seeFlame, noWall, fan, checkFlame, returnCoord, finish} robotState;
 
 // variable used to run code only once
 int first = 1;
 
 // motor variables
-const byte leftFWDPin = 13; // IN2
-const byte leftREVPin = 12;
-const byte rightFWDPin = 5; // IN1
-const byte rightREVPin = 4;
+const byte leftFWDPin = 11; // IN2
+const byte leftREVPin = 10;
+const byte rightFWDPin = 4; // IN1
+const byte rightREVPin = 5;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -59,8 +58,12 @@ long timer = 0; //general purpose timer
 long timer1 = 0;
 long timer2 = 0;
 
+int gyro_SP = 0;
+int turn_error = 0;
+
 // pid variables
-PID pidDrive;
+PID pidTurn;
+PID pidForward;
 
 void setup() {
   // set drive signal pins low
@@ -84,20 +87,43 @@ void setup() {
   gyroZero();
   accelInit();
   delay(1000);
-  pidDrive.setpid(1, 0.0002, 1.2);
+  pidTurn.setpid(1, 0.0002, 1.2);
+  pidForward.setpid(1.1, 0.0002, 1.2);
   timer = millis();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-//  switch (state) {
-//    case 0:
-//      gyroForward();
-//      break;
-//    case 1:
-//      driveStop();
-//      delay(3000);
-//  }
+  switch(robotState) {
+    case initial:
+      break;
+    case driveForward:
+      break;
+
+    case frontWall:
+      break;
+
+    case seeCandle:
+      break;
+    
+    case seeFlame:
+      break;
+    
+    case noWall:
+      break;
+    
+    case fan:
+      break;
+      
+    case checkFlame:
+      break;
+      
+    case returnCoord:
+      break;
+      
+    case finish:
+      break;
+  }
 }
 
 /* START OF IMU METHODS */
@@ -292,22 +318,23 @@ void changeSP(int dir) {
   }
 }
 
-// untested gyroForward()
+// drives straight using IMU feedback
 void gyroForward() {
   int rmotor_speed, lmotor_speed;
-  int motor_speed = 50;
+  int motor_const = 5; // to compensate for slower motor
+  int motor_speed = 90;
   turn_error = gyro_SP - gyro_z;
-  int motor_diff = pidDrive.calc(gyro_SP, gyro_z);
+  int motor_diff = pidForward.calc(gyro_SP, gyro_z);
   Serial.print("TURN ERR: ");
   Serial.println(turn_error);
-  
-  if(turn_error > 0) { // robot is facing right
-    rmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
+
+  if (turn_error > 0) { // robot is facing right
+    rmotor_speed = constrain(motor_speed + motor_diff + motor_const, 0, 254);
     lmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
     driveStraight(rmotor_speed, lmotor_speed);
   }
   else {
-    rmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
+    rmotor_speed = constrain(motor_speed - motor_diff - motor_const, 0, 254);
     lmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
     driveStraight(rmotor_speed, lmotor_speed);
   }
@@ -316,6 +343,9 @@ void gyroForward() {
   Serial.print(rmotor_speed);
   Serial.print(" LSPEED: ");
   Serial.println(lmotor_speed);
+
+  // updates gyro 
+  complementaryFilter();
 }
 
 // turns robot 90 deg in given direction
@@ -333,7 +363,7 @@ void gyroTurn(int dir) {
   Serial.print("GYRO: ");
   Serial.println(gyro_z);
 
-  int mspeed = pidDrive.calc(gyro_SP, gyro_z);
+  int mspeed = pidTurn.calc(gyro_SP, gyro_z);
 
   if (abs(turn_error) > 1) {
     Serial.print("PID: ");
@@ -347,7 +377,7 @@ void gyroTurn(int dir) {
   else {
     driveStop();
     first = 1;
-    state++;
+    robotState++;
   }
 }
 
