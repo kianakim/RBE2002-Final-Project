@@ -90,7 +90,14 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+//  switch (state) {
+//    case 0:
+//      gyroForward();
+//      break;
+//    case 1:
+//      driveStop();
+//      delay(3000);
+//  }
 }
 
 /* START OF IMU METHODS */
@@ -292,7 +299,7 @@ void gyroForward() {
   turn_error = gyro_SP - gyro_z;
   int motor_diff = pidDrive.calc(gyro_SP, gyro_z);
   Serial.print("TURN ERR: ");
-  Serial.println(turn_error)
+  Serial.println(turn_error);
   
   if(turn_error > 0) { // robot is facing right
     rmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
