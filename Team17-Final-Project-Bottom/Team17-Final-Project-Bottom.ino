@@ -1,6 +1,6 @@
-// Turn Drive with IMU
-// uses some functions from lab 4 compliment file
-
+// RBE2002 FInal Project Code
+// Team 17
+// Bottom Arduino Version
 #include <Wire.h>
 #include <L3G.h>
 #include <LSM303.h>
@@ -14,23 +14,36 @@ LSM303 accel;
 #define LEFT -1
 #define RIGHT 1
 
-unsigned int state = 0;
-int gyro_SP = 0;
-int turn_error = 0;
+// state machine variables
+//enum robotState {initial, driveForward, turning, frontWall, seeCandleBase, seeFlame, noWall, fan, checkFlame, returnCoord, finish} robotState;
+
+int state = 0;
+
+// states
+#define DRIVE_FORWARD 0
+#define TURNING 1
+#define FRONT_WALL 2
+#define NO_SIDE_WALL 3
+#define FLAME 4
+#define SEE_CANDLE_BASE 5
+#define FAN 6
+#define CHECK_FLAME 7
+#define RETURN_COORD 8
+#define FINISH 9
+#define STOP 10
+#define DRIVE_CLIFF 11
+#define PASS_WALL 12
+
+int turning_dir = 0;
+
+// variable used to run code only once
 int first = 1;
 
-boolean front_sensor = false;
-
 // motor variables
-<<<<<<< HEAD
-const int leftFWDPin = 10; // IN2
-const int leftREVPin = 11;
-=======
-const int leftFWDPin = 11; // IN2
-const int leftREVPin = 10;
->>>>>>> 04eee2e38e7cbf21e0c38b6460a2fb193b0a53e4
-const int rightFWDPin = 4; // IN1
-const int rightREVPin = 5;
+const byte leftFWDPin = 11; // IN2
+const byte leftREVPin = 10;
+const byte rightFWDPin = 4; // IN1
+const byte rightREVPin = 5;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -64,12 +77,12 @@ long timer = 0; //general purpose timer
 long timer1 = 0;
 long timer2 = 0;
 
+int gyro_SP = 0;
+int turn_error = 0;
+
 // pid variables
 PID pidTurn;
 PID pidForward;
-/* END OF VARIABLE DECLARATIONS */
-
-/* SETUP AND LOOP */
 
 void setup() {
   // set drive signal pins low
@@ -83,8 +96,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println("STARTING SETUP");
 
-  Wire.begin(); // start I2C
-
+  Wire.begin(); // start I2Crobot
   // initialize gyro sensor
   if (!gyro.init()) { // gyro init
     Serial.println("Failed to autodetect gyro type!");
@@ -100,62 +112,34 @@ void setup() {
 }
 
 void loop() {
-  //  Serial.println(state);
   switch (state) {
-    case 0:
-//            gyroTurn(RIGHT);
+    case DRIVE_FORWARD:
       gyroForward();
       break;
-    case 1:
+
+    case TURNING:
+      gyroTurn(LEFT); // just put in w/e dir
+      break;
+
+    case STOP:
       driveStop();
-      state = 2;
-      delay(3000);
       break;
-    case 2:
-      gyroTurn(LEFT);
-      break;
-    case 3:
-<<<<<<< HEAD
-      gyroForward();
-      break;
-    case 4:
-      Serial.println(gyro_z);
-      driveStop();
-      delay(1000);
-     
-=======
-      driveStop();
-      delay(3000);
-      state = 4;
-      break;
-    case 4:
-      if (!front_sensor) {
+
+    case DRIVE_CLIFF:
+      while(1) { // 
         gyroForward();
       }
-      else {
-        driveStop();
-        delay(3000);
-        state = 5;
+      break;
+
+    case PASS_WALL:
+      while(1) {
+        gyroForward();
       }
->>>>>>> 04eee2e38e7cbf21e0c38b6460a2fb193b0a53e4
+      break;
+    
+    case FLAME:
+      break;
   }
-
-  //  if ((millis() - timer) >= 20)
-  //  {
-  //    complementaryFilter();
-  //  }
-  //  // prints the gyro value once per second
-  //  if ((millis() - timer2) >= 1000)
-  //  {
-  //    printGyro();
-  //  }
-
-  //  delay(1000);
-  //  gyroTurn();
-  //  Serial.println("DONE");
-  //  driveStop();
-  //  delay(5000);
-  //  exit(1);
 }
 
 /* START OF IMU METHODS */
@@ -291,69 +275,6 @@ void complementaryFilter() {
 
 /* START OF DRIVE METHODS */
 
-// untested gyroForward()
-void gyroForward() {
-  int rmotor_speed, lmotor_speed;
-  int motor_const = 5; // to compensate for slower motor
-  int motor_speed = 90;
-  turn_error = gyro_SP - gyro_z;
-  int motor_diff = pidForward.calc(gyro_SP, gyro_z);
-  Serial.print("TURN ERR: ");
-  Serial.println(turn_error);
-
-  if (turn_error > 0) { // robot is facing right
-    rmotor_speed = constrain(motor_speed + motor_diff + motor_const, 0, 254);
-    lmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
-    driveStraight(rmotor_speed, lmotor_speed);
-  }
-  else {
-    rmotor_speed = constrain(motor_speed - motor_diff - motor_const, 0, 254);
-    lmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
-    driveStraight(rmotor_speed, lmotor_speed);
-  }
-
-  Serial.print("RSPEED: ");
-  Serial.print(rmotor_speed);
-  Serial.print(" LSPEED: ");
-  Serial.println(lmotor_speed);
-
-  complementaryFilter();
-
-}
-
-// turns robot 90 deg in given direction
-// not enough power when angle error < like 3 deg
-void gyroTurn(int dir) {
-  // change setpoint on initial run
-  if (first) {
-    changeSP(dir);
-    first = 0;
-  }
-  turn_error = gyro_SP - gyro_z;
-
-  Serial.print("SP: ");
-  Serial.println(gyro_SP);
-  Serial.print("GYRO: ");
-  Serial.println(gyro_z);
-
-  int mspeed = pidTurn.calc(gyro_SP, gyro_z);
-
-  if (abs(turn_error) > 1) {
-    Serial.print("PID: ");
-    Serial.println(mspeed);
-    // run drive turn method w/ P-controlled speed
-    driveTurn(setTurnDir(turn_error), mspeed);
-
-    // update sensor reading
-    complementaryFilter();
-  }
-  else {
-    driveStop();
-    first = 1;
-    state++;
-  }
-}
-
 // set drive motor speed and direction
 void driveTurn(int dir, int motor_speed) {
 
@@ -391,6 +312,9 @@ void driveStop() {
   analogWrite(rightREVPin, 0);
 }
 
+/* END OF DRIVE METHODS */
+
+/* START OF GYRO METHODS */
 // set turn direction based on sign of error
 int setTurnDir(double error) {
   if (error < 0) {
@@ -410,20 +334,125 @@ void changeSP(int dir) {
   }
 }
 
-// LEFT ENCODER RETURNING WEIRD VALUES
-// too much slack on wheels to use
-//void encTurn(int dir) {
-//  int total_counts = 2900; // 90 deg
-//  int rightRead = rightDriveEnc.read();
-//  turn_error = total_counts - abs(rightRead);
-//  Serial.print("LEFT: ");
-//  Serial.println(rightRead);
-//
-//  if (turn_error > 5) {
-//    driveTurn(dir, 100);
-//  }
-//  else {
-//    driveStop();
-//    state++;
-//  }
-//}
+// drives straight using IMU feedback
+void gyroForward() {
+  int rmotor_speed, lmotor_speed;
+  int motor_const = 5; // to compensate for slower motor
+  int motor_speed = 90;
+  turn_error = gyro_SP - gyro_z;
+  int motor_diff = pidForward.calc(gyro_SP, gyro_z);
+  Serial.print("TURN ERR: ");
+  Serial.println(turn_error);
+
+  if (turn_error > 0) { // robot is facing right
+    rmotor_speed = constrain(motor_speed + motor_diff + motor_const, 0, 254);
+    lmotor_speed = constrain(motor_speed - motor_diff, 0, 254);
+    driveStraight(rmotor_speed, lmotor_speed);
+  }
+  else {
+    rmotor_speed = constrain(motor_speed - motor_diff - motor_const, 0, 254);
+    lmotor_speed = constrain(motor_speed + motor_diff, 0, 254);
+    driveStraight(rmotor_speed, lmotor_speed);
+  }
+
+  Serial.print("RSPEED: ");
+  Serial.print(rmotor_speed);
+  Serial.print(" LSPEED: ");
+  Serial.println(lmotor_speed);
+
+  // updates gyro
+  complementaryFilter();
+}
+
+// turns robot 90 deg in given direction
+// not enough power when angle error < like 3 deg
+void gyroTurn(int dir) {
+  // change setpoint on initial run
+  if (first) {
+    changeSP(dir);
+    first = 0;
+  }
+  turn_error = gyro_SP - gyro_z;
+
+  Serial.print("SP: ");
+  Serial.println(gyro_SP);
+  Serial.print("GYRO: ");
+  Serial.println(gyro_z);
+
+  int mspeed = pidTurn.calc(gyro_SP, gyro_z);
+
+  if (abs(turn_error) > 1) {
+    Serial.print("PID: ");
+    Serial.println(mspeed);
+    // run drive turn method w/ P-controlled speed
+    driveTurn(setTurnDir(turn_error), mspeed);
+
+    // update sensor reading
+    complementaryFilter();
+  }
+  else {
+    driveStop();
+    first = 1;
+    state++; // FIX STATE!!!!!!!!!
+  }
+}
+
+/* END OF GYRO METHODS */
+int curr_branch = 0;
+#define CLIFF_BRANCH 0
+#define FRONT_WALL_BRANCH 1
+#define NO_SIDE_WALL_BRANCH 2
+#define FLAME_BRANCH 3
+
+// set branch in state machine / interrupt
+int stateArr[4][] = {
+  {STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                   // cliff
+  {STOP, TURNING, DRIVE_FORWARD},                                // front wall
+  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL, DRIVE_FORWARD},  // no side wall
+  {STOP, TURNING, DRIVE_FORWARD, FLAME, STOP}                    // flame
+};
+
+void stateManager(int branch, int curr_state) {
+  int cliffMax = 3;
+  int frontWallMax = 2;
+  int noSideWallMax = 5;
+  int flameMax = 5;
+  int arrayMax = 0;
+
+  switch (branch) {
+    case CLIFF_BRANCH:
+      arrayMax = cliffMax;
+      break;
+    case FRONT_WALL_BRANCH:
+      arrayMax = frontWallMax;
+      break;
+    case NO_SIDE_WALL_BRANCH:
+      arrayMax = noSideWallMax;
+      break;
+    case FLAME_BRANCH:
+      arrayMax = flameMax;
+      break;
+  }
+
+  for (int i = 0; i < arrayMax; i++) {
+    // find current state
+    if (curr_state = stateArr[curr_branch][i]) {
+      if (curr_state != arrayMax - 1) {
+        state = stateArr[branch][i + 1];
+      }
+    }
+  }
+}
+
+// interrupt
+void frontWallInt() {
+  curr_branch = FRONT_WALL_BRANCH;
+  stateManager(curr_branch, 0);
+}
+
+// interrupt
+void flameInt() {
+  curr_branch = FLAME_BRANCH;
+  stateManager(curr_branch, 0);
+}
+
