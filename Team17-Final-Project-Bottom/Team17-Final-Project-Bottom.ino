@@ -28,6 +28,7 @@ const byte backLeftRXPin = 0;
 const byte sideWallRXPin = 0;
 const byte flameRXPin = 0;
 const byte cliffRXPin = 0;
+const byte candleBaseRXPin = 0;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -183,7 +184,7 @@ void loop() {
       break;
 
     case DRIVE_CLIFF: // read pin
-      if (1) { // there is a wall,
+      if (!frontRightRXPin && !backRightRXPin) { // there is a wall (both sensors blocked)
         gyroForward();
       }
       else {
@@ -203,7 +204,7 @@ void loop() {
       break;
 
     case DRIVE_CANDLE_BASE: // read pin
-      if (1) { // ian writing condition
+      if (candleBaseRXPin) { // ian writing condition
         gyroForward();
       }
       else {
@@ -228,7 +229,7 @@ void loop() {
 
     case CHECK_FLAME_OUT: //
       // read flame pin, check if low/high
-      if (1) {
+      if (flameRXPin) {
         stateManager();
       }
       else {
@@ -245,7 +246,6 @@ void loop() {
       exit(1);
       break;
   }
-
 }
 
 /* STATE MANAGER METHODS */
