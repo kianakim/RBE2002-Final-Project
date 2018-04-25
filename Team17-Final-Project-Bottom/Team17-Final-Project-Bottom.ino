@@ -449,17 +449,17 @@ void gyroTurn(int dir) {
 }
 
 /* END OF GYRO METHODS */
-int state_step = 0;
 
 // set branch in state machine / interrupt
 int stateArr[5][6] = {
-  {TURNING, DRIVE_FORWARD},                                               // hug wall
-  {DRIVE_STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                            // cliff
-  {DRIVE_STOP, TURNING, DRIVE_FORWARD},                                         // front wall
-  {PASS_WALL, DRIVE_STOP, TURNING, DRIVE_STOP, PASS_WALL, DRIVE_FORWARD},           // no side wall
+  {TURNING, DRIVE_FORWARD},                                                           // hug wall
+  {DRIVE_STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                                  // cliff
+  {DRIVE_STOP, TURNING, DRIVE_FORWARD},                                               // front wall
+  {PASS_WALL, DRIVE_STOP, TURNING, DRIVE_STOP, PASS_WALL, DRIVE_FORWARD},             // no side wall
   {DRIVE_STOP, TURNING, DRIVE_CANDLE_BASE, DRIVE_STOP, CHECK_FLAME_OUT, RETURN_COORD} // flame
 };
 
+// set states based on what "branch" of code is running
 void stateManager() {
   int arrayMax = 0;
   int hugWallMax = 2;
@@ -467,7 +467,7 @@ void stateManager() {
   int frontWallMax = 3;
   int noSideWallMax = 6;
   int flameMax = 6;
-  
+
   switch (curr_branch) {
     case HUG_WALL_BRANCH:
       arrayMax = hugWallMax;
@@ -486,18 +486,35 @@ void stateManager() {
       break;
   }
 
+  // set state
   state = stateArr[curr_branch][branch_step];
 }
 
 // interrupt
 void frontWallInt() {
   curr_branch = FRONT_WALL_BRANCH;
+  branch_step = 0;
   stateManager();
 }
 
 // interrupt
 void flameInt() {
   curr_branch = FLAME_BRANCH;
+  branch_step = 0;
+  stateManager();
+}
+
+// interrupt
+void noSideWallInt() {
+  curr_branch = NO_SIDE_WALL_BRANCH;
+  branch_step = 0;
+  stateManager();
+}
+
+// interrupt
+void cliffInt() {
+  curr_branch = CLIFF_BRANCH;
+  branch_step = 0;
   stateManager();
 }
 
@@ -510,6 +527,7 @@ int countsToCM(int enc_counts) {
   return cm;
 }
 
+// print LCD goes on top project
 void printToLCD() {
   lcd.setCursor(0, 0);
   lcd.print("x:");
@@ -536,7 +554,6 @@ void numberTurn() {
 void distanceCovered() {
   distance = (val / 1632.67) * (3.14 * 2.75) ; // inches
   delay(100);
-
 }
 
 void coordinateTrack() {

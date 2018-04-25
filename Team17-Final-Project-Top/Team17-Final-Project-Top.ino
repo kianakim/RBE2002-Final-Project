@@ -74,7 +74,7 @@ void loop() {
 boolean ultrasonicState(int sensor) {
   int dist = 10;
 
-  if (dist_cm[sensor] > dist) { // dummy number
+  if (dist_cm[sensor] > dist) { // 10 cm ~4"
     return true;
   }
   else {
@@ -160,32 +160,22 @@ void seeFlame() {
   // read flame sensor
   int sensorReading = analogRead(flamePin);
 
-  if (sensorReading < 900 && sensorReading > 600) { //Distant Fire
-    //turn right and drive 20 inches
-    //turn right
-  }
+//  if (sensorReading < 900 && sensorReading > 600) { //Distant Fire
+//    //turn right and drive 20 inches
+//    //turn right
+//  }
 
-  else if (sensorReading < 600 && sensorReading > 300) { //close fire
+  if (sensorReading < 600) { //close fire
+    digitalWrite(flameSignal, HIGH);
     //turn right and drive 10 inches
     //turn right
   }
 
   else if (sensorReading < 300) { //point blank fire
-    digitalWrite(flameSignal, HIGH);
+//    digitalWrite(flameSignal, HIGH);
   }
 }
 
-//boolean isFrontWall() {
-//  if (ultrasonicState(FRONT)) {
-//    digitalWrite(13, HIGH);
-//    return true;
-//  }
-//  else {
-//    digitalWrite(13, LOW);
-//    return false;
-//  }
-//}
-//
 boolean isSideWall() {
   if (ultrasonicState(FRONT_RIGHT) && ultrasonicState(BACK_RIGHT)) {
     digitalWrite(12, HIGH);
@@ -195,5 +185,17 @@ boolean isSideWall() {
     digitalWrite(12, LOW);
     return false;
   }
+}
+
+// print LCD goes on top project
+void printToLCD() {
+  lcd.setCursor(0, 0);
+  lcd.print("x:");
+  lcd.print(candle_x);
+  lcd.print("in");
+  lcd.setCursor(0, 1); //delete line if using z
+  lcd.print("y:");
+  lcd.print(candle_y);
+  lcd.print("in");
 }
 
