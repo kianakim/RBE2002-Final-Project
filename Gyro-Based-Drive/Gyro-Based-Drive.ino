@@ -22,8 +22,13 @@ int first = 1;
 boolean front_sensor = false;
 
 // motor variables
+<<<<<<< HEAD
+const int leftFWDPin = 10; // IN2
+const int leftREVPin = 11;
+=======
 const int leftFWDPin = 11; // IN2
 const int leftREVPin = 10;
+>>>>>>> 04eee2e38e7cbf21e0c38b6460a2fb193b0a53e4
 const int rightFWDPin = 4; // IN1
 const int rightREVPin = 5;
 
@@ -110,6 +115,15 @@ void loop() {
       gyroTurn(LEFT);
       break;
     case 3:
+<<<<<<< HEAD
+      gyroForward();
+      break;
+    case 4:
+      Serial.println(gyro_z);
+      driveStop();
+      delay(1000);
+     
+=======
       driveStop();
       delay(3000);
       state = 4;
@@ -123,6 +137,7 @@ void loop() {
         delay(3000);
         state = 5;
       }
+>>>>>>> 04eee2e38e7cbf21e0c38b6460a2fb193b0a53e4
   }
 
   //  if ((millis() - timer) >= 20)
