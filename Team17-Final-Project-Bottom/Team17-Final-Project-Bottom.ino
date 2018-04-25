@@ -19,15 +19,15 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 Encoder leftDriveEnc(10, 11);
 Encoder rightDriveEnc(2, 3);
 
-// signal receiving pins
-const byte frontRecPin = 0;
-const byte frontRightRecPin = 0
-const byte backRightRecPin = 0;
-const byte frontLeftRecPin = 0;
-const byte backLeftRecPin = 0;
-const byte wallRecPin = 0;
-const byte flameRecPin = 0;
-const byte cliffRecPin = 0;
+// signal receiving pins 
+const byte frontRXPin = 0;
+const byte frontRightRXPin = 0;
+const byte backRightRXPin = 0;
+const byte frontLeftRXPin = 0;
+const byte backLeftRXPin = 0;
+const byte sideWallRXPin = 0;
+const byte flameRXPin = 0;
+const byte cliffRXPin = 0;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -41,7 +41,6 @@ int turning_dir = 0;
 #define RIGHT 1
 
 // states
-int state = HUG_WALL;
 #define DRIVE_FORWARD 0
 #define TURNING 1
 #define DRIVE_STOP 2
@@ -55,15 +54,16 @@ int state = HUG_WALL;
 #define FINISH 10
 #define ESTOP 11
 #define HUG_WALL 12
+int state = HUG_WALL;
 
 // branch states
-int curr_branch = 0;
-int branch_step = 0;
 #define HUG_WALL_BRANCH 0
 #define CLIFF_BRANCH 1
 #define FRONT_WALL_BRANCH 2
 #define NO_SIDE_WALL_BRANCH 3
 #define FLAME_BRANCH 4
+int curr_branch = 0;
+int branch_step = 0;
 
 // variable used to run code only once
 int first = 1;
@@ -124,6 +124,12 @@ void setup() {
   // fan setup
   fanRotate.attach(12);
   fanRotate.write(0);
+
+  // interrupt pin setup
+  attachInterrupt(digitalPinToInterrupt(flameRXPin), flameInt, RISING);
+  attachInterrupt(digitalPinToInterrupt(frontRXPin), frontWallInt, RISING);
+  attachInterrupt(digitalPinToInterrupt(sideWallRXPin), noSideWallInt, RISING);
+  attachInterrupt(digitalPinToInterrupt(cliffRXPin), cliffInt, RISING);
 
   // serial monitor setup
   Serial.begin(9600);
@@ -239,7 +245,7 @@ void loop() {
       exit(1);
       break;
   }
-  Serial.println(
+
 }
 
 /* STATE MANAGER METHODS */
