@@ -19,6 +19,16 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 Encoder leftDriveEnc(10, 11);
 Encoder rightDriveEnc(2, 3);
 
+// signal receiving pins
+const byte frontRecPin = 0;
+const byte frontRightRecPin = 0
+const byte backRightRecPin = 0;
+const byte frontLeftRecPin = 0;
+const byte backLeftRecPin = 0;
+const byte wallRecPin = 0;
+const byte flameRecPin = 0;
+const byte cliffRecPin = 0;
+
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
 #define TESTING 587716
@@ -31,7 +41,7 @@ int turning_dir = 0;
 #define RIGHT 1
 
 // states
-int state = 0;
+int state = HUG_WALL;
 #define DRIVE_FORWARD 0
 #define TURNING 1
 #define DRIVE_STOP 2
@@ -137,6 +147,10 @@ void setup() {
   // pid setup
   pidTurn.setpid(1, 0.0002, 1.2);
   pidForward.setpid(1.1, 0.0002, 1.2);
+
+  // set initial state
+  state = HUG_WALL;
+
   timer = millis();
 }
 
@@ -158,11 +172,17 @@ void loop() {
 
     case DRIVE_STOP:  // DONE
       driveStop();
+      branch_step++;
+      stateManager();
       break;
 
     case DRIVE_CLIFF: // read pin
       if (1) { // there is a wall,
         gyroForward();
+      }
+      else {
+        branch_step++;
+        stateManager();
       }
       break;
 
@@ -170,11 +190,18 @@ void loop() {
       if (countsToCM(rightDriveEnc.read()) < 15) {
         gyroForward();
       }
+      else {
+        branch_step++;
+        stateManager();
+      }
       break;
 
     case DRIVE_CANDLE_BASE: // read pin
       if (1) { // ian writing condition
         gyroForward();
+      }
+      else {
+        branch_step++;
       }
       break;
 
@@ -204,6 +231,7 @@ void loop() {
       break;
 
     case RETURN_COORD: // DONE
+      driveStop();
       printToLCD();
       break;
 
@@ -211,6 +239,49 @@ void loop() {
       exit(1);
       break;
   }
+  Serial.println(
+}
+
+/* STATE MANAGER METHODS */
+
+// set branch in state machine / interrupt
+int stateArr[5][6] = {
+  {TURNING, DRIVE_FORWARD},                                                           // hug wall
+  {DRIVE_STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                                  // cliff
+  {DRIVE_STOP, TURNING, DRIVE_FORWARD},                                               // front wall
+  {PASS_WALL, DRIVE_STOP, TURNING, DRIVE_STOP, PASS_WALL, DRIVE_FORWARD},             // no side wall
+  {DRIVE_STOP, TURNING, DRIVE_CANDLE_BASE, DRIVE_STOP, CHECK_FLAME_OUT, RETURN_COORD} // flame
+};
+
+// set states based on what "branch" of code is running
+void stateManager() {
+  int arrayMax = 0;
+  int hugWallMax = 2;
+  int cliffMax = 4;
+  int frontWallMax = 3;
+  int noSideWallMax = 6;
+  int flameMax = 6;
+
+  switch (curr_branch) {
+    case HUG_WALL_BRANCH:
+      arrayMax = hugWallMax;
+      break;
+    case CLIFF_BRANCH:
+      arrayMax = cliffMax;
+      break;
+    case FRONT_WALL_BRANCH:
+      arrayMax = frontWallMax;
+      break;
+    case NO_SIDE_WALL_BRANCH:
+      arrayMax = noSideWallMax;
+      break;
+    case FLAME_BRANCH:
+      arrayMax = flameMax;
+      break;
+  }
+
+  // set state
+  state = stateArr[curr_branch][branch_step];
 }
 
 /* START OF IMU METHODS */
@@ -444,51 +515,14 @@ void gyroTurn(int dir) {
   else {
     driveStop();
     first = 1;
+    branch_step++;
     stateManager();
   }
 }
 
 /* END OF GYRO METHODS */
 
-// set branch in state machine / interrupt
-int stateArr[5][6] = {
-  {TURNING, DRIVE_FORWARD},                                                           // hug wall
-  {DRIVE_STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                                  // cliff
-  {DRIVE_STOP, TURNING, DRIVE_FORWARD},                                               // front wall
-  {PASS_WALL, DRIVE_STOP, TURNING, DRIVE_STOP, PASS_WALL, DRIVE_FORWARD},             // no side wall
-  {DRIVE_STOP, TURNING, DRIVE_CANDLE_BASE, DRIVE_STOP, CHECK_FLAME_OUT, RETURN_COORD} // flame
-};
-
-// set states based on what "branch" of code is running
-void stateManager() {
-  int arrayMax = 0;
-  int hugWallMax = 2;
-  int cliffMax = 4;
-  int frontWallMax = 3;
-  int noSideWallMax = 6;
-  int flameMax = 6;
-
-  switch (curr_branch) {
-    case HUG_WALL_BRANCH:
-      arrayMax = hugWallMax;
-      break;
-    case CLIFF_BRANCH:
-      arrayMax = cliffMax;
-      break;
-    case FRONT_WALL_BRANCH:
-      arrayMax = frontWallMax;
-      break;
-    case NO_SIDE_WALL_BRANCH:
-      arrayMax = noSideWallMax;
-      break;
-    case FLAME_BRANCH:
-      arrayMax = flameMax;
-      break;
-  }
-
-  // set state
-  state = stateArr[curr_branch][branch_step];
-}
+/* INTERRUPT METHODS */
 
 // interrupt
 void frontWallInt() {
@@ -521,6 +555,8 @@ void cliffInt() {
 void estopInt() {
   state = ESTOP;
 }
+
+/* COORDINATE METHODS */
 
 int countsToCM(int enc_counts) {
   int cm = ((enc_counts) / 1632.67) * 3.14 * 6.985;

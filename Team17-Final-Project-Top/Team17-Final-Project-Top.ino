@@ -30,18 +30,26 @@ double dist_cm[SONAR_NUM];
 
 // Cliff Sensor
 const byte cliffPin = 1; // dummy
-const byte cliffSignal = 2; // dummy
+const byte cliffTXPin = 2; // dummy
 
 // Flame Sensor
 const byte flamePin = 0; // dummy
-const byte flameSignal = 3; // dummy
+const byte flameTXPin = 3; // dummy
+
+// signal trasmit pins
+const byte frontTXPin = 0;
+const byte frontRightTXPin = 0
+const byte backRightTXPin = 0;
+const byte frontLeftTXPin = 0;
+const byte backLeftTXPin = 0;
+const byte wallTXPin = 0;
 
 void setup() {
   Serial.begin(115200);
 
   // pin initialization
-  pinMode(cliffSignal, OUTPUT);
-  pinMode(flameSignal, OUTPUT);
+  pinMode(cliffTXPin, OUTPUT);
+  pinMode(flameTXPin, OUTPUT);
   pinMode(FRONT, OUTPUT);
   pinMode(FRONT_RIGHT, OUTPUT);
   pinMode(BACK_RIGHT, OUTPUT);
@@ -49,8 +57,8 @@ void setup() {
   pinMode(BACK_LEFT, OUTPUT);
 
   // set pins low
-  digitalWrite(cliffSignal, LOW);
-  digitalWrite(flameSignal, LOW);
+  digitalWrite(cliffTXPin, LOW);
+  digitalWrite(flameTXPin, LOW);
   digitalWrite(FRONT, LOW);
   digitalWrite(FRONT_RIGHT, LOW);
   digitalWrite(BACK_RIGHT, LOW);
@@ -65,7 +73,10 @@ void setup() {
 }
 
 void loop() {
-
+  readAllUltrasonic();
+  seeCliff();
+  seeFlame();
+  isSideWall();
 }
 
 /* ULTRASONIC SENSOR METHODS */
@@ -164,15 +175,8 @@ void seeFlame() {
 //    //turn right and drive 20 inches
 //    //turn right
 //  }
-
   if (sensorReading < 600) { //close fire
     digitalWrite(flameSignal, HIGH);
-    //turn right and drive 10 inches
-    //turn right
-  }
-
-  else if (sensorReading < 300) { //point blank fire
-//    digitalWrite(flameSignal, HIGH);
   }
 }
 
@@ -183,7 +187,7 @@ boolean isSideWall() {
   }
   else {
     digitalWrite(12, LOW);
-    return false;
+    return false
   }
 }
 
