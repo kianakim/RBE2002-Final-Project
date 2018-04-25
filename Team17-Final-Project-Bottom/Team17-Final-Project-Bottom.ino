@@ -16,6 +16,15 @@ Servo fanRotate;
 const int rs = 18, en = 19, d4 = 17, d5 = 16, d6 = 15, d7 = 14;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
+Encoder leftDriveEnc(10, 11);
+Encoder rightDriveEnc(2, 3);
+
+// encoder variables
+#define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
+#define TESTING 587716
+#define DISTIN_TO_DEG 20.834  // 360deg/(2*Pi*2.75" wheel)
+#define DISTCM_TO_DEG 8.203   // 360deg/(2*Pi*6.985cm wheel)
+
 // FRONT IS THE SIDE WITH THE BREADBOARD
 int turning_dir = 0;
 #define LEFT -1
@@ -25,7 +34,7 @@ int turning_dir = 0;
 int state = 0;
 #define DRIVE_FORWARD 0
 #define TURNING 1
-#define STOP 2
+#define DRIVE_STOP 2
 #define DRIVE_CLIFF 3
 #define PASS_WALL 4
 #define DRIVE_CANDLE_BASE 5
@@ -35,6 +44,7 @@ int state = 0;
 #define RETURN_COORD 9
 #define FINISH 10
 #define ESTOP 11
+#define HUG_WALL 12
 
 // branch states
 int curr_branch = 0;
@@ -53,15 +63,6 @@ const byte leftFWDPin = 11; // IN2
 const byte leftREVPin = 10;
 const byte rightFWDPin = 4; // IN1
 const byte rightREVPin = 5;
-
-// encoder variables
-#define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
-#define TESTING 587716
-#define DISTIN_TO_DEG 20.834  // 360deg/(2*Pi*2.75" wheel)
-#define DISTCM_TO_DEG 8.203   // 360deg/(2*Pi*6.985cm wheel)
-
-Encoder leftDriveEnc(10, 11);
-Encoder rightDriveEnc(2, 3);
 
 // gyro variables
 double G_Dt = 0.035;  // Integration time (DCM algorithm)
@@ -98,7 +99,7 @@ double candle_x = 0;
 double candle_y = 0;
 double candle_z = 0;
 double numberTurns = 0;
-//double val = 3300;
+double val = 0;
 double distance;
 volatile double numberofTurns = 0;
 
@@ -144,7 +145,7 @@ void loop() {
     case HUG_WALL:
       curr_branch = HUG_WALL_BRANCH;
       branch_step = 0;
-      stateManager(curr_branch, branch_step);
+      stateManager();
       break;
 
     case DRIVE_FORWARD: // DONE
@@ -155,12 +156,12 @@ void loop() {
       gyroTurn(LEFT); // dont' know if needs RIGHT
       break;
 
-    case STOP:  // DONE
+    case DRIVE_STOP:  // DONE
       driveStop();
       break;
 
-    case DRIVE_CLIFF: //
-      while () { // there is a wall,
+    case DRIVE_CLIFF: // read pin
+      if (1) { // there is a wall,
         gyroForward();
       }
       break;
@@ -171,13 +172,13 @@ void loop() {
       }
       break;
 
-    case DRIVE_CANDLE_BASE: //
-      while () { // ian writing condition
+    case DRIVE_CANDLE_BASE: // read pin
+      if (1) { // ian writing condition
         gyroForward();
       }
       break;
 
-    case FAN_ON: //
+    case FAN_ON: // might need to edit
       // fan code rishi
       digitalWrite(1, HIGH);
       break;
@@ -194,7 +195,7 @@ void loop() {
 
     case CHECK_FLAME_OUT: //
       // read flame pin, check if low/high
-      if () {
+      if (1) {
         stateManager();
       }
       else {
@@ -443,7 +444,7 @@ void gyroTurn(int dir) {
   else {
     driveStop();
     first = 1;
-    stateManager(curr_branch, TURNING);
+    stateManager();
   }
 }
 
@@ -453,21 +454,21 @@ int state_step = 0;
 // set branch in state machine / interrupt
 int stateArr[5][6] = {
   {TURNING, DRIVE_FORWARD},                                               // hug wall
-  {STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                            // cliff
-  {STOP, TURNING, DRIVE_FORWARD},                                         // front wall
-  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL, DRIVE_FORWARD},           // no side wall
-  {STOP, TURNING, DRIVE_CANDLE_BASE, STOP, CHECK_FLAME_OUT, RETURN_COORD} // flame
+  {DRIVE_STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                            // cliff
+  {DRIVE_STOP, TURNING, DRIVE_FORWARD},                                         // front wall
+  {PASS_WALL, DRIVE_STOP, TURNING, DRIVE_STOP, PASS_WALL, DRIVE_FORWARD},           // no side wall
+  {DRIVE_STOP, TURNING, DRIVE_CANDLE_BASE, DRIVE_STOP, CHECK_FLAME_OUT, RETURN_COORD} // flame
 };
 
-void stateManager(int branch, int curr_state) {
+void stateManager() {
+  int arrayMax = 0;
   int hugWallMax = 2;
   int cliffMax = 4;
   int frontWallMax = 3;
   int noSideWallMax = 6;
   int flameMax = 6;
-  int arrayMax = 0;
-
-  switch (branch) {
+  
+  switch (curr_branch) {
     case HUG_WALL_BRANCH:
       arrayMax = hugWallMax;
       break;
@@ -491,13 +492,13 @@ void stateManager(int branch, int curr_state) {
 // interrupt
 void frontWallInt() {
   curr_branch = FRONT_WALL_BRANCH;
-  stateManager(curr_branch, 0);
+  stateManager();
 }
 
 // interrupt
 void flameInt() {
   curr_branch = FLAME_BRANCH;
-  stateManager(curr_branch, 0);
+  stateManager();
 }
 
 void estopInt() {
@@ -543,17 +544,17 @@ void coordinateTrack() {
     candle_y = candle_y + distance;
   }
   else if (numberofTurns == 2) {
-    myEncoder.write(0);
+    rightDriveEnc.write(0);
     candle_x = candle_x + distance;
     // val = 0;
   }
   else if (numberofTurns == 3) {
-    myEncoder.write(0);
+    rightDriveEnc.write(0);
     candle_y = candle_y - distance;
     // val = 0;
   }
   else if (numberofTurns == 4) {
-    myEncoder.write(0);
+    rightDriveEnc.write(0);
     candle_x = candle_x - distance;
     // val = 0;
   }
