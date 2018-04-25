@@ -5,36 +5,43 @@
 #include <L3G.h>
 #include <LSM303.h>
 #include <Encoder.h>
+#include <Servo.h>
+#include <LiquidCrystal.h>
 #include "PID.h"
 
 L3G gyro;
 LSM303 accel;
+Servo fanRotate;
+
+const int rs = 18, en = 19, d4 = 17, d5 = 16, d6 = 15, d7 = 14;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // FRONT IS THE SIDE WITH THE BREADBOARD
+int turning_dir = 0;
 #define LEFT -1
 #define RIGHT 1
 
-// state machine variables
-//enum robotState {initial, driveForward, turning, frontWall, seeCandleBase, seeFlame, noWall, fan, checkFlame, returnCoord, finish} robotState;
-
-int state = 0;
-
 // states
+int state = 0;
 #define DRIVE_FORWARD 0
 #define TURNING 1
-#define FRONT_WALL 2
-#define NO_SIDE_WALL 3
-#define FLAME 4
-#define SEE_CANDLE_BASE 5
-#define FAN 6
-#define CHECK_FLAME 7
-#define RETURN_COORD 8
-#define FINISH 9
-#define STOP 10
-#define DRIVE_CLIFF 11
-#define PASS_WALL 12
+#define STOP 2
+#define DRIVE_CLIFF 3
+#define PASS_WALL 4
+#define DRIVE_CANDLE_BASE 5
+#define FAN_ON 6
+#define ROTATE_FAN 7
+#define CHECK_FLAME_OUT 8
+#define RETURN_COORD 9
+#define FINISH 10
+#define ESTOP 11
 
-int turning_dir = 0;
+// branch states
+int curr_branch = 0;
+#define CLIFF_BRANCH 0
+#define FRONT_WALL_BRANCH 1
+#define NO_SIDE_WALL_BRANCH 2
+#define FLAME_BRANCH 3
 
 // variable used to run code only once
 int first = 1;
@@ -84,6 +91,15 @@ int turn_error = 0;
 PID pidTurn;
 PID pidForward;
 
+// coordinate variables
+double candle_x = 0;
+double candle_y = 0;
+double candle_z = 0;
+double numberTurns = 0;
+//double val = 3300;
+double distance;
+volatile double numberofTurns = 0;
+
 void setup() {
   // set drive signal pins low
   analogWrite(leftFWDPin, 0);
@@ -91,6 +107,9 @@ void setup() {
   analogWrite(rightFWDPin, 0);
   analogWrite(rightREVPin, 0);
   delay(1000);
+
+  fanRotate.attach(12);
+  fanRotate.write(0);
 
   // serial monitor setup
   Serial.begin(9600);
@@ -106,6 +125,7 @@ void setup() {
   gyroZero();
   accelInit();
   delay(1000);
+  lcd.begin(16, 2);
   pidTurn.setpid(1, 0.0002, 1.2);
   pidForward.setpid(1.1, 0.0002, 1.2);
   timer = millis();
@@ -113,31 +133,67 @@ void setup() {
 
 void loop() {
   switch (state) {
-    case DRIVE_FORWARD:
+    case DRIVE_FORWARD: // DONE
       gyroForward();
       break;
 
     case TURNING:
-      gyroTurn(LEFT); // just put in w/e dir
+      gyroTurn(LEFT); // dont' know if needs RIGHT
       break;
 
-    case STOP:
+    case STOP:  // DONE
       driveStop();
       break;
 
     case DRIVE_CLIFF:
-      while(1) { // 
+      while () { // there is a wall,
         gyroForward();
       }
       break;
 
     case PASS_WALL:
-      while(1) {
+      if (countsToCM(rightDriveEnc.read()) < 15) { // x cm encoder count rishi
         gyroForward();
       }
       break;
-    
-    case FLAME:
+
+    case DRIVE_CANDLE_BASE:
+      while (1) { // ian writing condition
+        gyroForward();
+      }
+      break;
+
+    case FAN_ON:
+      // fan code rishi
+
+      break;
+
+    case ROTATE_FAN:
+      // go up and down three times
+      for (int i = 0; i < 3; i++) {
+        fanRotate.write(60);
+        delay(3000);
+        fanRotate.write(90);
+        delay(1000);
+      }
+      break;
+
+    case CHECK_FLAME_OUT:
+      // read flame pin, check if low/high
+      if () {
+        // change state
+      }
+      else {
+
+      }
+      break;
+
+    case RETURN_COORD:
+      printToLCD();
+      break;
+
+    case ESTOP:
+      exit(1);
       break;
   }
 }
@@ -196,26 +252,6 @@ void gyroReset() {
   gerrx = 0;
   gerry = 0;
   gerrz = 0;
-}
-
-// print gyro
-// from lab4 file
-void printGyro() {
-  timer2 = millis();
-
-  Serial.print(" GX: ");
-  Serial.print(gyro_x);
-  Serial.print(" GY: ");
-  Serial.print(gyro_y);
-  Serial.print(" GZ: ");
-  Serial.print(gyro_z);
-
-  Serial.print("  Ax =  ");
-  Serial.print(accel_x);
-  Serial.print("  Ay =  ");
-  Serial.print(accel_y);
-  Serial.print("  Az =  ");
-  Serial.println(accel_z);
 }
 
 // initialize accelerometer - lab4 compliment file
@@ -393,30 +429,26 @@ void gyroTurn(int dir) {
   else {
     driveStop();
     first = 1;
-    state++; // FIX STATE!!!!!!!!!
+    stateManager(curr_branch, TURNING);
   }
 }
 
 /* END OF GYRO METHODS */
-int curr_branch = 0;
-#define CLIFF_BRANCH 0
-#define FRONT_WALL_BRANCH 1
-#define NO_SIDE_WALL_BRANCH 2
-#define FLAME_BRANCH 3
+int state_step = 0;
 
 // set branch in state machine / interrupt
-int stateArr[4][] = {
-  {STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                   // cliff
-  {STOP, TURNING, DRIVE_FORWARD},                                // front wall
-  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL, DRIVE_FORWARD},  // no side wall
-  {STOP, TURNING, DRIVE_FORWARD, FLAME, STOP}                    // flame
+int stateArr[4][6] = {
+  {STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                            // cliff
+  {STOP, TURNING, DRIVE_FORWARD},                                         // front wall
+  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL, DRIVE_FORWARD},           // no side wall
+  {STOP, TURNING, DRIVE_CANDLE_BASE, STOP, CHECK_FLAME_OUT, RETURN_COORD} // flame
 };
 
 void stateManager(int branch, int curr_state) {
-  int cliffMax = 3;
-  int frontWallMax = 2;
-  int noSideWallMax = 5;
-  int flameMax = 5;
+  int cliffMax = 4;
+  int frontWallMax = 3;
+  int noSideWallMax = 6;
+  int flameMax = 6;
   int arrayMax = 0;
 
   switch (branch) {
@@ -456,3 +488,54 @@ void flameInt() {
   stateManager(curr_branch, 0);
 }
 
+void estopInt() {
+  state = ESTOP;
+}
+
+double inputDistance;
+double encoderCount;
+
+encoderCount = (inputDistance * 1632.67) / (3.14 * 6.985); // in cm
+
+void onCommandDrive(double inputDistance) {
+  if (rightDriveEnc.read() < numberEncoderCount) {
+    gyroForward;
+  }
+  else if (Encoder.read() => numberEncoderCount) {
+    driveStop;
+  }
+}
+
+int countsToCM(int enc_counts) {
+  int cm = ((enc_counts) / 1632.67) * 3.14 * 6.985;
+  return cm;
+}
+
+void printToLCD() {
+  lcd.setCursor(0, 0);
+  lcd.print("x:");
+  lcd.print(candle_x);
+  lcd.print("in");
+  lcd.setCursor(0, 1); //delete line if using z
+  lcd.print("y:");
+  lcd.print(candle_y);
+  lcd.print("in");
+}
+
+// checks if the robot turned right and if the robot turned it adds 1 to turns count
+void encoderPos() {
+  val = rightDriveEnc.read() ;          // read position
+}
+
+void numberTurn() {
+  if (turning_dir = LEFT) {
+    numberofTurns = numberofTurns + 1;
+  }
+}
+
+// calculates the distance covered by the robot based on the encoders count
+void distanceCovered() {
+  distance = (val / 1632.67) * (3.14 * 2.75) ; // inches
+  delay(100);
+
+}

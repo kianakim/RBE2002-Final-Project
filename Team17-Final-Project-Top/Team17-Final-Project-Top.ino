@@ -72,8 +72,9 @@ void loop() {
 
 // return whether the sensor sees a wall or not
 boolean ultrasonicState(int sensor) {
+  int dist = 10;
 
-  if (dist_cm[sensor] > 20) { // dummy number
+  if (dist_cm[sensor] > dist) { // dummy number
     return true;
   }
   else {
@@ -125,14 +126,13 @@ void echoCheck() {
     dist_cm[active_sensor] = sensors[active_sensor].ping_result / 58.2; // convert uS to cm
 }
 
-/* CLIFF SENSOR METHODS */
+/* SIGNAL TRANSFER METHODS */
 
 // these are bad names pls change
-void rangefinder() {
+void seeCliff() {
   int distance;
 
-  // read rangefinder
-  GP2D12 = read_gp2d12_range(cliffPin);
+  // read rangefinder  GP2D12 = read_gp2d12_range(cliffPin);
   a = GP2D12 / 10;
   b = GP2D12 % 10;
   distance = a * 10 + b;
@@ -156,9 +156,7 @@ float read_gp2d12_range(byte pin)
   return (6787.0 / ((float)tmp - 3.0)) - 4.0;
 }
 
-// fix because this wont work with digital signal transfer
-// thing to send information to other arduino
-void flameSensor() {
+void seeFlame() {
   // read flame sensor
   int sensorReading = analogRead(flamePin);
 
@@ -173,12 +171,29 @@ void flameSensor() {
   }
 
   else if (sensorReading < 300) { //point blank fire
-    //turn right
     digitalWrite(flameSignal, HIGH);
-    //side to side/up down
-    // might need delay HIGH-LOW depending on interrupt mode
-    digitalWrite(flameSignal, LOW);
-    //turn right
+  }
+}
+
+//boolean isFrontWall() {
+//  if (ultrasonicState(FRONT)) {
+//    digitalWrite(13, HIGH);
+//    return true;
+//  }
+//  else {
+//    digitalWrite(13, LOW);
+//    return false;
+//  }
+//}
+//
+boolean isSideWall() {
+  if (ultrasonicState(FRONT_RIGHT) && ultrasonicState(BACK_RIGHT)) {
+    digitalWrite(12, HIGH);
+    return true;
+  }
+  else {
+    digitalWrite(12, LOW);
+    return false;
   }
 }
 
