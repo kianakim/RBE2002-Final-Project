@@ -38,10 +38,12 @@ int state = 0;
 
 // branch states
 int curr_branch = 0;
-#define CLIFF_BRANCH 0
-#define FRONT_WALL_BRANCH 1
-#define NO_SIDE_WALL_BRANCH 2
-#define FLAME_BRANCH 3
+int branch_step = 0;
+#define HUG_WALL_BRANCH 0
+#define CLIFF_BRANCH 1
+#define FRONT_WALL_BRANCH 2
+#define NO_SIDE_WALL_BRANCH 3
+#define FLAME_BRANCH 4
 
 // variable used to run code only once
 int first = 1;
@@ -108,6 +110,7 @@ void setup() {
   analogWrite(rightREVPin, 0);
   delay(1000);
 
+  // fan setup
   fanRotate.attach(12);
   fanRotate.write(0);
 
@@ -121,11 +124,16 @@ void setup() {
     Serial.println("Failed to autodetect gyro type!");
     while (1);
   }
+
   gyro.enableDefault(); // 250 deg/s
   gyroZero();
   accelInit();
   delay(1000);
+
+  // lcd setup
   lcd.begin(16, 2);
+
+  // pid setup
   pidTurn.setpid(1, 0.0002, 1.2);
   pidForward.setpid(1.1, 0.0002, 1.2);
   timer = millis();
@@ -133,6 +141,12 @@ void setup() {
 
 void loop() {
   switch (state) {
+    case HUG_WALL:
+      curr_branch = HUG_WALL_BRANCH;
+      branch_step = 0;
+      stateManager(curr_branch, branch_step);
+      break;
+
     case DRIVE_FORWARD: // DONE
       gyroForward();
       break;
@@ -145,30 +159,30 @@ void loop() {
       driveStop();
       break;
 
-    case DRIVE_CLIFF:
+    case DRIVE_CLIFF: //
       while () { // there is a wall,
         gyroForward();
       }
       break;
 
-    case PASS_WALL:
-      if (countsToCM(rightDriveEnc.read()) < 15) { // x cm encoder count rishi
+    case PASS_WALL: // DONE
+      if (countsToCM(rightDriveEnc.read()) < 15) {
         gyroForward();
       }
       break;
 
-    case DRIVE_CANDLE_BASE:
-      while (1) { // ian writing condition
+    case DRIVE_CANDLE_BASE: //
+      while () { // ian writing condition
         gyroForward();
       }
       break;
 
-    case FAN_ON:
+    case FAN_ON: //
       // fan code rishi
-
+      digitalWrite(1, HIGH);
       break;
 
-    case ROTATE_FAN:
+    case ROTATE_FAN: // DONE
       // go up and down three times
       for (int i = 0; i < 3; i++) {
         fanRotate.write(60);
@@ -178,17 +192,17 @@ void loop() {
       }
       break;
 
-    case CHECK_FLAME_OUT:
+    case CHECK_FLAME_OUT: //
       // read flame pin, check if low/high
       if () {
-        // change state
+        stateManager();
       }
       else {
-
+        stateManager();
       }
       break;
 
-    case RETURN_COORD:
+    case RETURN_COORD: // DONE
       printToLCD();
       break;
 
@@ -437,7 +451,8 @@ void gyroTurn(int dir) {
 int state_step = 0;
 
 // set branch in state machine / interrupt
-int stateArr[4][6] = {
+int stateArr[5][6] = {
+  {TURNING, DRIVE_FORWARD},                                               // hug wall
   {STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                            // cliff
   {STOP, TURNING, DRIVE_FORWARD},                                         // front wall
   {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL, DRIVE_FORWARD},           // no side wall
@@ -445,6 +460,7 @@ int stateArr[4][6] = {
 };
 
 void stateManager(int branch, int curr_state) {
+  int hugWallMax = 2;
   int cliffMax = 4;
   int frontWallMax = 3;
   int noSideWallMax = 6;
@@ -452,6 +468,9 @@ void stateManager(int branch, int curr_state) {
   int arrayMax = 0;
 
   switch (branch) {
+    case HUG_WALL_BRANCH:
+      arrayMax = hugWallMax;
+      break;
     case CLIFF_BRANCH:
       arrayMax = cliffMax;
       break;
@@ -466,14 +485,7 @@ void stateManager(int branch, int curr_state) {
       break;
   }
 
-  for (int i = 0; i < arrayMax; i++) {
-    // find current state
-    if (curr_state = stateArr[curr_branch][i]) {
-      if (curr_state != arrayMax - 1) {
-        state = stateArr[branch][i + 1];
-      }
-    }
-  }
+  state = stateArr[curr_branch][branch_step];
 }
 
 // interrupt
@@ -490,20 +502,6 @@ void flameInt() {
 
 void estopInt() {
   state = ESTOP;
-}
-
-double inputDistance;
-double encoderCount;
-
-encoderCount = (inputDistance * 1632.67) / (3.14 * 6.985); // in cm
-
-void onCommandDrive(double inputDistance) {
-  if (rightDriveEnc.read() < numberEncoderCount) {
-    gyroForward;
-  }
-  else if (Encoder.read() => numberEncoderCount) {
-    driveStop;
-  }
 }
 
 int countsToCM(int enc_counts) {
@@ -539,3 +537,25 @@ void distanceCovered() {
   delay(100);
 
 }
+
+void coordinateTrack() {
+  if (numberofTurns == 1) {
+    candle_y = candle_y + distance;
+  }
+  else if (numberofTurns == 2) {
+    myEncoder.write(0);
+    candle_x = candle_x + distance;
+    // val = 0;
+  }
+  else if (numberofTurns == 3) {
+    myEncoder.write(0);
+    candle_y = candle_y - distance;
+    // val = 0;
+  }
+  else if (numberofTurns == 4) {
+    myEncoder.write(0);
+    candle_x = candle_x - distance;
+    // val = 0;
+  }
+}
+
