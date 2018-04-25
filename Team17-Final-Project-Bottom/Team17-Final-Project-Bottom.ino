@@ -29,6 +29,7 @@ const byte sideWallRXPin = 0;
 const byte flameRXPin = 0;
 const byte cliffRXPin = 0;
 const byte candleBaseRXPin = 0;
+const byte fanPin = 0;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -123,7 +124,7 @@ void setup() {
   delay(1000);
 
   // fan setup
-  fanRotate.attach(12);
+  fanRotate.attach(fanPin);
   fanRotate.write(0);
 
   // interrupt pin setup
@@ -246,6 +247,7 @@ void loop() {
       exit(1);
       break;
   }
+  Serial.println(state);
 }
 
 /* STATE MANAGER METHODS */
