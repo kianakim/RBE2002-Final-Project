@@ -7,15 +7,15 @@
 #define TWO_MOTOR_TEST 1
 
 // Motor Pins ORANGE - IN1, BRWN - IN2
-const int leftFWDPin = 13; // IN2
-const int leftREVPin = 12;
+const int leftFWDPin = 10; // IN2
+const int leftREVPin = 11;
 const int rightFWDPin = 5; // IN1
 const int rightREVPin = 4;
 
 // PATTERN LOOKING AT IT W/ DIGITAL PINS ON FAR SIDE: O - B - O - B
 
 // Encoders
-Encoder leftDrive(10, 11); // YEL - INT3, WH - D1
+Encoder leftDrive(9, 8); // YEL - INT3, WH - D1
 Encoder rightDrive(2, 3); // YEL - INT2, WH - D0
 
 

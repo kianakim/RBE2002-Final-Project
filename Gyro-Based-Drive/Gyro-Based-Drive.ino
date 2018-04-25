@@ -24,10 +24,10 @@ int first = 1;
 boolean front_sensor = false;
 
 // motor variables
-const int leftFWDPin = 13; // IN2
-const int leftREVPin = 12;
-const int rightFWDPin = 5; // IN1
-const int rightREVPin = 4;
+const int leftFWDPin = 10; // IN2
+const int leftREVPin = 11;
+const int rightFWDPin = 4; // IN1
+const int rightREVPin = 5;
 
 // encoder variables
 #define COUNTS_PER_DEG 4.535  // 1632.67 counts/rev * 1 rev/360deg
@@ -109,9 +109,13 @@ void loop() {
       gyroTurn(LEFT);
       break;
     case 3:
+      gyroForward();
+      break;
+    case 4:
       Serial.println(gyro_z);
       driveStop();
       delay(1000);
+     
   }
 
   //  if ((millis() - timer) >= 20)
