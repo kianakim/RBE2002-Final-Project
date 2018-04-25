@@ -32,8 +32,7 @@ int state = 0;
 #define FINISH 9
 #define STOP 10
 #define DRIVE_CLIFF 11
-#define DRIVE_WALL 12
-
+#define PASS_WALL 12
 
 int turning_dir = 0;
 
@@ -113,50 +112,34 @@ void setup() {
 }
 
 void loop() {
-  //  switch (state) {
-  //    case DRIVE_FORWARD:
-  //      // interrupt will change state from this one
-  //      gyroForward();
-  //      break;
-  //
-  //    case TURNING:
-  ////      stopDrive();
-  //      turning_dir = LEFT;
-  //      state = turning;
-  //
-  //      //remember last interrupt
-  //
-  //      break;
-  //
-  //    case seeCandleBase:
-  //      break;
-  //
-  //    case turning:
-  //      gyroTurn(LEFT);
-  //      break;
-  //
-  //    case seeFlame:
-  //      break;
-  //
-  //    case noWall:
-  //      driveForward();
-  //      driveStop();
-  //      gyroTurn(RIGHT);
-  //      driveForward();
-  //      break;
-  //
-  //    case fan:
-  //      break;
-  //
-  //    case checkFlame:
-  //      break;
-  //
-  //    case returnCoord:
-  //      break;
-  //
-  //    case finish:
-  //      break;
-  //  }
+  switch (state) {
+    case DRIVE_FORWARD:
+      gyroForward();
+      break;
+
+    case TURNING:
+      gyroTurn(LEFT); // just put in w/e dir
+      break;
+
+    case STOP:
+      driveStop();
+      break;
+
+    case DRIVE_CLIFF:
+      while(1) { // 
+        gyroForward();
+      }
+      break;
+
+    case PASS_WALL:
+      while(1) {
+        gyroForward();
+      }
+      break;
+    
+    case FLAME:
+      break;
+  }
 }
 
 /* START OF IMU METHODS */
@@ -415,18 +398,18 @@ void gyroTurn(int dir) {
 }
 
 /* END OF GYRO METHODS */
-int branch = 0;
+int curr_branch = 0;
 #define CLIFF_BRANCH 0
 #define FRONT_WALL_BRANCH 1
 #define NO_SIDE_WALL_BRANCH 2
 #define FLAME_BRANCH 3
 
 // set branch in state machine / interrupt
-int stateArr[4][5] = {
-  {STOP, TURNING, DRIVE_CLIFF},                   // cliff
-  {STOP, TURNING},                                // front wall
-  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL},  // no side wall
-  {STOP, TURNING, DRIVE_FORWARD, FLAME, STOP}    // flame
+int stateArr[4][] = {
+  {STOP, TURNING, DRIVE_CLIFF, DRIVE_FORWARD},                   // cliff
+  {STOP, TURNING, DRIVE_FORWARD},                                // front wall
+  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL, DRIVE_FORWARD},  // no side wall
+  {STOP, TURNING, DRIVE_FORWARD, FLAME, STOP}                    // flame
 };
 
 void stateManager(int branch, int curr_state) {
@@ -453,14 +436,23 @@ void stateManager(int branch, int curr_state) {
 
   for (int i = 0; i < arrayMax; i++) {
     // find current state
-    if (curr_state = stateArr[branch][i]) {
-      if (curr_state == arrayMax - 1) {
-        state = DRIVE_FORWARD;
-      }
-      else {
+    if (curr_state = stateArr[curr_branch][i]) {
+      if (curr_state != arrayMax - 1) {
         state = stateArr[branch][i + 1];
       }
     }
   }
+}
+
+// interrupt
+void frontWallInt() {
+  curr_branch = FRONT_WALL_BRANCH;
+  stateManager(curr_branch, 0);
+}
+
+// interrupt
+void flameInt() {
+  curr_branch = FLAME_BRANCH;
+  stateManager(curr_branch, 0);
 }
 
