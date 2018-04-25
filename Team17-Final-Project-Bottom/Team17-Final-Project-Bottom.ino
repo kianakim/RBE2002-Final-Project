@@ -15,7 +15,27 @@ LSM303 accel;
 #define RIGHT 1
 
 // state machine variables
-static enum robotState {initial, driveForward, frontWall, seeCandle, seeFlame, noWall, fan, checkFlame, returnCoord, finish} robotState;
+//enum robotState {initial, driveForward, turning, frontWall, seeCandleBase, seeFlame, noWall, fan, checkFlame, returnCoord, finish} robotState;
+
+int state = 0;
+
+// states
+#define DRIVE_FORWARD 0
+#define TURNING 1
+#define FRONT_WALL 2
+#define NO_SIDE_WALL 3
+#define FLAME 4
+#define SEE_CANDLE_BASE 5
+#define FAN 6
+#define CHECK_FLAME 7
+#define RETURN_COORD 8
+#define FINISH 9
+#define STOP 10
+#define DRIVE_CLIFF 11
+#define DRIVE_WALL 12
+
+
+int turning_dir = 0;
 
 // variable used to run code only once
 int first = 1;
@@ -77,7 +97,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println("STARTING SETUP");
 
-  Wire.begin(); // start I2C
+  Wire.begin(); // start I2Crobot
   // initialize gyro sensor
   if (!gyro.init()) { // gyro init
     Serial.println("Failed to autodetect gyro type!");
@@ -93,37 +113,50 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  switch(robotState) {
-    case initial:
-      break;
-    case driveForward:
-      break;
-
-    case frontWall:
-      break;
-
-    case seeCandle:
-      break;
-    
-    case seeFlame:
-      break;
-    
-    case noWall:
-      break;
-    
-    case fan:
-      break;
-      
-    case checkFlame:
-      break;
-      
-    case returnCoord:
-      break;
-      
-    case finish:
-      break;
-  }
+  //  switch (state) {
+  //    case DRIVE_FORWARD:
+  //      // interrupt will change state from this one
+  //      gyroForward();
+  //      break;
+  //
+  //    case TURNING:
+  ////      stopDrive();
+  //      turning_dir = LEFT;
+  //      state = turning;
+  //
+  //      //remember last interrupt
+  //
+  //      break;
+  //
+  //    case seeCandleBase:
+  //      break;
+  //
+  //    case turning:
+  //      gyroTurn(LEFT);
+  //      break;
+  //
+  //    case seeFlame:
+  //      break;
+  //
+  //    case noWall:
+  //      driveForward();
+  //      driveStop();
+  //      gyroTurn(RIGHT);
+  //      driveForward();
+  //      break;
+  //
+  //    case fan:
+  //      break;
+  //
+  //    case checkFlame:
+  //      break;
+  //
+  //    case returnCoord:
+  //      break;
+  //
+  //    case finish:
+  //      break;
+  //  }
 }
 
 /* START OF IMU METHODS */
@@ -344,7 +377,7 @@ void gyroForward() {
   Serial.print(" LSPEED: ");
   Serial.println(lmotor_speed);
 
-  // updates gyro 
+  // updates gyro
   complementaryFilter();
 }
 
@@ -377,9 +410,57 @@ void gyroTurn(int dir) {
   else {
     driveStop();
     first = 1;
-    robotState++;
+    state++; // FIX STATE!!!!!!!!!
   }
 }
 
 /* END OF GYRO METHODS */
+int branch = 0;
+#define CLIFF_BRANCH 0
+#define FRONT_WALL_BRANCH 1
+#define NO_SIDE_WALL_BRANCH 2
+#define FLAME_BRANCH 3
+
+// set branch in state machine / interrupt
+int stateArr[4][5] = {
+  {STOP, TURNING, DRIVE_CLIFF},                   // cliff
+  {STOP, TURNING},                                // front wall
+  {DRIVE_WALL, STOP, TURNING, STOP, DRIVE_WALL},  // no side wall
+  {STOP, TURNING, DRIVE_FORWARD, FLAME, STOP}    // flame
+};
+
+void stateManager(int branch, int curr_state) {
+  int cliffMax = 3;
+  int frontWallMax = 2;
+  int noSideWallMax = 5;
+  int flameMax = 5;
+  int arrayMax = 0;
+
+  switch (branch) {
+    case CLIFF_BRANCH:
+      arrayMax = cliffMax;
+      break;
+    case FRONT_WALL_BRANCH:
+      arrayMax = frontWallMax;
+      break;
+    case NO_SIDE_WALL_BRANCH:
+      arrayMax = noSideWallMax;
+      break;
+    case FLAME_BRANCH:
+      arrayMax = flameMax;
+      break;
+  }
+
+  for (int i = 0; i < arrayMax; i++) {
+    // find current state
+    if (curr_state = stateArr[branch][i]) {
+      if (curr_state == arrayMax - 1) {
+        state = DRIVE_FORWARD;
+      }
+      else {
+        state = stateArr[branch][i + 1];
+      }
+    }
+  }
+}
 
