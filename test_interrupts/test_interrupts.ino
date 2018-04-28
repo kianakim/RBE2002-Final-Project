@@ -9,10 +9,10 @@ void setup() {
   Serial.begin(9600);
   Serial.println("STARTING SETUP");
 
-  pinMode(flameRXPin, INPUT_PULLUP);
-  pinMode(frontRXPin, INPUT_PULLUP);
-  pinMode(sideWallRXPin, INPUT_PULLUP);
-  pinMode(cliffRXPin, INPUT_PULLUP);
+  pinMode(flameRXPin, INPUT);
+  pinMode(frontRXPin, INPUT);
+  pinMode(sideWallRXPin, INPUT);
+  pinMode(cliffRXPin, INPUT);
   
   attachInterrupt(digitalPinToInterrupt(flameRXPin), flameInt, RISING);
   attachInterrupt(digitalPinToInterrupt(frontRXPin), frontWallInt, RISING);
